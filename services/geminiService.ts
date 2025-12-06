@@ -1,11 +1,19 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Vendor, UserType } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy initialization to prevent crash on load if env is missing
+const getAI = () => {
+  const apiKey = process.env.API_KEY || '';
+  if (!apiKey) {
+      console.warn("Gemini API Key is missing.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 // Function to generate realistic initial vendor data if the app is empty
 export const generateMockVendors = async (locationName: string): Promise<Vendor[]> => {
   try {
+    const ai = getAI();
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Generate a list of 6 realistic small local businesses or freelancers specifically in Campo Largo, Paraná, Brazil. 
@@ -60,6 +68,7 @@ export const generateMockVendors = async (locationName: string): Promise<Vendor[
 // Function to interpret natural language search queries
 export const interpretSearchQuery = async (query: string): Promise<{ category?: string, keywords: string[] }> => {
   try {
+    const ai = getAI();
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Analyze the user search query: "${query}". 

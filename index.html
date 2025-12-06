@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>O Que Tem Perto?</title>
     
+    <!-- Polyfill para evitar erro 'process is not defined' -->
+    <script>
+      window.process = {
+        env: {
+          NODE_ENV: 'production',
+          API_KEY: '' // Evita crash inicial se a chave não for injetada
+        }
+      };
+    </script>
+
     <!-- PWA / Android -->
     <link rel="manifest" href="./manifest.json" />
     <meta name="theme-color" content="#0ea5e9" />
@@ -56,6 +66,38 @@
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+      
+      /* Loading State Styles */
+      #root:empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+      }
+      #root:empty::after {
+        content: 'Carregando O Que Tem Perto...';
+        color: #0ea5e9;
+        font-weight: bold;
+        margin-top: 10px;
+      }
+      #root:empty::before {
+        content: '';
+        width: 40px;
+        height: 40px;
+        border: 4px solid #e0f2fe;
+        border-top: 4px solid #0ea5e9;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      
+      /* Error message style */
+      #error-display {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: white; color: red; z-index: 9999; padding: 20px;
+        display: none;
+      }
     </style>
   <script type="importmap">
 {
@@ -71,7 +113,21 @@
 </script>
 </head>
   <body>
+    <div id="error-display"></div>
     <div id="root"></div>
+    
+    <script>
+      // Global Error Handler to debug "Blue Screen"
+      window.onerror = function(message, source, lineno, colno, error) {
+        const errorDiv = document.getElementById('error-display');
+        if (errorDiv) {
+          errorDiv.style.display = 'block';
+          errorDiv.innerHTML = `<h3>Ocorreu um erro ao iniciar o app:</h3><pre>${message}</pre><p>Tente recarregar a página.</p>`;
+        }
+        console.error("Global Error:", error);
+      };
+    </script>
+
     <script type="module" src="./index.tsx"></script>
     <script>
       // Register Service Worker for PWA
