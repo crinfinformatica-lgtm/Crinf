@@ -8,7 +8,6 @@ import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo } from './comp
 import { INITIAL_DB } from './database';
 
 // --- Lazy Loading Pages (Code Splitting) ---
-// Isso resolve o aviso "Chunk Size Limit" carregando as páginas sob demanda
 const HomePage = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })));
 const VendorDetails = lazy(() => import('./pages/VendorDetails').then(module => ({ default: module.VendorDetails })));
 const Register = lazy(() => import('./pages/Register').then(module => ({ default: module.Register })));
@@ -180,78 +179,6 @@ export const useAppContext = () => {
   const context = useContext(AppContext);
   if (!context) throw new Error("useAppContext must be used within AppProvider");
   return context;
-};
-
-// --- Google Login Component (Simulated) ---
-interface GoogleLoginButtonProps {
-    onClick?: () => void;
-    text?: string;
-    onSuccess?: (googleData: any) => void;
-}
-
-export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({ onClick, text = "Continuar com Google", onSuccess }) => {
-  const { dispatch, state } = useAppContext();
-  const navigate = useNavigate();
-
-  const handleGoogleLogin = () => {
-    if (onClick) onClick();
-
-    setTimeout(() => {
-        const mockCPF = "000.000.000-00"; 
-        
-        let mockEmail = "usuario@gmail.com";
-        let mockName = "Usuário Google";
-        const mockPhoto = "https://lh3.googleusercontent.com/a/default-user";
-
-        if (onSuccess) {
-             const randomId = Math.floor(Math.random() * 1000);
-             mockEmail = `novo.usuario${randomId}@gmail.com`;
-        }
-        
-        if (onSuccess) {
-            onSuccess({
-                name: mockName,
-                email: mockEmail,
-                photoUrl: mockPhoto
-            });
-            return; 
-        }
-
-        if (state.bannedDocuments.includes(mockCPF) || state.bannedDocuments.includes(mockEmail)) {
-            alert("Acesso negado: Esta conta foi suspensa pelo administrador.");
-            return;
-        }
-
-        const mockUser: UserType = {
-            id: `google_${Date.now()}`,
-            name: mockName,
-            email: mockEmail,
-            cpf: mockCPF, 
-            address: "Campo Largo, PR",
-            type: UserEnum.USER,
-            photoUrl: mockPhoto
-        };
-
-        dispatch({ type: 'LOGIN', payload: mockUser });
-        navigate('/');
-    }, 800);
-  };
-
-  return (
-    <button 
-      type="button"
-      onClick={handleGoogleLogin}
-      className={`w-full flex items-center justify-center border text-font-semibold py-3 px-4 rounded-xl transition shadow-sm gap-3 relative overflow-hidden active:scale-95 duration-200 bg-white border-gray-300 text-gray-700 hover:bg-gray-50`}
-    >
-      <svg className="w-5 h-5" viewBox="0 0 24 24">
-        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-      </svg>
-      {text}
-    </button>
-  );
 };
 
 // --- Footer Component ---
@@ -451,7 +378,7 @@ const SettingsPage: React.FC = () => {
                 )}
                 
                 <div className="text-center pt-8 pb-4">
-                    <p className="text-xs text-gray-400">Versão do App: 1.5.0 (PWA)</p>
+                    <p className="text-xs text-gray-400">Versão do App: 1.6.0 (PWA)</p>
                 </div>
              </div>
         </div>
@@ -484,7 +411,7 @@ const ResetPasswordPage: React.FC = () => {
         setTimeout(() => {
             dispatch({ type: 'CHANGE_PASSWORD', payload: { email: emailFromUrl, newPass } });
             alert("Senha alterada com sucesso! Faça login com a nova senha.");
-            navigate('/admin-login'); 
+            navigate('/login'); 
         }, 1500);
     };
 
@@ -668,20 +595,16 @@ const AdminLogin: React.FC = () => {
                             <CheckCircle size={32} />
                         </div>
                         <h3 className="text-lg font-bold text-gray-800">Link Enviado!</h3>
-                        <p className="text-sm text-gray-500">
-                            Verifique o e-mail <strong>{forgotEmail}</strong> para continuar o processo de alteração de senha.
+                        <p className="text-sm text-gray-600">
+                            Um link seguro para redefinição de senha foi enviado para <strong>{forgotEmail}</strong>.
                         </p>
-                        <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                            <p className="text-xs text-gray-400 uppercase font-bold mb-2 tracking-wider">Simulação (Demo)</p>
-                            <button 
-                                onClick={() => {
-                                    setForgotModalOpen(false);
-                                    navigate(`/reset-password?email=${encodeURIComponent(forgotEmail)}`);
-                                }}
-                                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 flex items-center justify-center w-full gap-2"
-                            >
-                                Definir Nova Senha <ArrowRight size={16}/>
-                            </button>
+                        <p className="text-xs text-gray-500">
+                            Acesse seu e-mail e siga as instruções para criar uma nova senha.
+                        </p>
+                        <div className="mt-6">
+                            <Button fullWidth onClick={() => setForgotModalOpen(false)}>
+                                Fechar
+                            </Button>
                         </div>
                     </div>
                 )}
@@ -749,11 +672,7 @@ const Login: React.FC = () => {
                 handleFailedAttempt();
             }
         } else {
-             if (email === 'maria@email.com' && password === '123') {
-                  alert("Usuário não encontrado ou senha incorreta.");
-             } else {
-                 handleFailedAttempt();
-             }
+             handleFailedAttempt();
         }
     };
 
@@ -765,7 +684,7 @@ const Login: React.FC = () => {
             setLockoutTime(Date.now() + lockoutDuration);
             alert("Muitas tentativas incorretas. O login foi bloqueado temporariamente por 5 minutos.");
         } else {
-            alert(`Senha incorreta. Tentativa ${newAttempts} de 3.`);
+            alert(`Senha incorreta ou Usuário não encontrado. Tentativa ${newAttempts} de 3.`);
         }
     };
 
@@ -814,13 +733,13 @@ const Login: React.FC = () => {
                   <button onClick={handleLogin} className="w-full bg-primary text-white font-bold py-3.5 rounded-xl hover:bg-sky-600 transition shadow-lg shadow-sky-200 mt-2">
                     Entrar
                   </button>
-
-                  <div className="relative flex py-2 items-center">
-                    <div className="flex-grow border-t border-gray-200"></div>
-                    <span className="flex-shrink-0 mx-4 text-gray-400 text-xs font-semibold uppercase">Ou acesse com</span>
-                    <div className="flex-grow border-t border-gray-200"></div>
+                  
+                  <div className="mt-4 pt-4 border-t border-gray-200 text-center">
+                       <p className="text-sm text-gray-600 mb-2">Não tem uma conta?</p>
+                       <Link to="/register" className="text-primary font-bold hover:underline">
+                           Criar nova conta
+                       </Link>
                   </div>
-                  <GoogleLoginButton text="Entrar com Google" />
                 </div>
             </div>
 

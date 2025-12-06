@@ -1,9 +1,9 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Store, Upload, X, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, User, Store, Upload, X, MapPin, Lock } from 'lucide-react';
 import { Button, Input } from '../components/UI';
-import { useAppContext, GoogleLoginButton } from '../App';
+import { useAppContext } from '../App';
 import { UserType, CATEGORIES } from '../types';
 
 export const Register: React.FC = () => {
@@ -11,16 +11,11 @@ export const Register: React.FC = () => {
   const { state, dispatch } = useAppContext();
   const [activeTab, setActiveTab] = useState<UserType>(UserType.USER);
 
-  // --- Step Control ---
-  // Step 1: Authentication (Google Only)
-  // Step 2: Details (CPF, Address, etc)
-  const [step, setStep] = useState<1 | 2>(1);
-  const [googleData, setGoogleData] = useState<{name: string, email: string, photoUrl: string} | null>(null);
-
   // Common State
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  // Password is removed as auth is via Google only
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [address, setAddress] = useState('');
   
   // User Specific
@@ -50,15 +45,6 @@ export const Register: React.FC = () => {
   const [linkType, setLinkType] = useState('Instagram');
   const [linkValue, setLinkValue] = useState('');
 
-  // Handle Google Success
-  const handleGoogleSuccess = (data: any) => {
-      setGoogleData(data);
-      setName(data.name);
-      setEmail(data.email);
-      setPhotoPreview(data.photoUrl);
-      setStep(2);
-  };
-
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -86,8 +72,18 @@ export const Register: React.FC = () => {
     e.preventDefault();
     
     // Validation
-    if (!name || !email || !address) {
+    if (!name || !email || !address || !password) {
         alert("Preencha todos os campos obrigatórios.");
+        return;
+    }
+
+    if (password.length < 6) {
+        alert("A senha deve ter no mínimo 6 caracteres.");
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        alert("As senhas não coincidem.");
         return;
     }
 
@@ -133,13 +129,14 @@ export const Register: React.FC = () => {
             name,
             email,
             cpf: userCPF,
-            address,
+            address: `${address} - Campo Largo/PR`, // Enforce City
             type: UserType.USER,
             photoUrl: photoPreview || undefined,
-            password: 'google_auth_secure' // Placeholder for internal logic
+            password: password
         };
         dispatch({ type: 'ADD_USER', payload: newUser });
         dispatch({ type: 'LOGIN', payload: newUser });
+        alert("Cadastro realizado com sucesso!");
         navigate('/');
     } else {
         // --- CHECK 3: Duplicate Vendors ---
@@ -184,7 +181,7 @@ export const Register: React.FC = () => {
             name,
             document: vendorDoc,
             phone,
-            address,
+            address: `${address} - Campo Largo/PR`, // Enforce City
             categories: [finalCategory],
             description,
             website: finalWebsite, 
@@ -200,15 +197,30 @@ export const Register: React.FC = () => {
             }
         };
         
+        // Add as vendor AND as a login user
         dispatch({ type: 'ADD_VENDOR', payload: newVendor });
-        dispatch({ type: 'LOGIN', payload: { 
+        
+        // Create a user entry so they can login
+        const vendorUser = {
             id: newVendor.id, 
             name: newVendor.name, 
             email, 
             cpf: vendorDoc, 
-            address, 
-            type: UserType.VENDOR 
-        }});
+            address: newVendor.address, 
+            type: UserType.VENDOR,
+            password: password,
+            photoUrl: photoPreview || undefined
+        };
+        
+        // We add to users list strictly for login purposes, usually systems separate this but for this local DB app it works fine
+        // Note: Check if email exists in users to avoid collision if they try to register vendor with same email as user
+        const isDuplicateEmailUser = state.users.some(u => u.email === email);
+        if(!isDuplicateEmailUser) {
+             dispatch({ type: 'ADD_USER', payload: vendorUser });
+        }
+
+        dispatch({ type: 'LOGIN', payload: vendorUser });
+        alert("Comércio cadastrado com sucesso!");
         navigate('/');
     }
   };
@@ -225,17 +237,17 @@ export const Register: React.FC = () => {
             <p className="text-gray-500">Faça parte do O Que Tem Perto?</p>
         </div>
 
-        {/* Tabs - Only clickable in Step 1 */}
+        {/* Tabs */}
         <div className="flex bg-white p-1 rounded-xl shadow-sm mb-6 border border-gray-100">
             <button 
-                className={`flex-1 py-2 rounded-lg text-sm font-semibold flex items-center justify-center transition-all ${activeTab === UserType.USER ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'} ${step === 2 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                onClick={() => step === 1 && setActiveTab(UserType.USER)}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold flex items-center justify-center transition-all ${activeTab === UserType.USER ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
+                onClick={() => setActiveTab(UserType.USER)}
             >
                 <User size={16} className="mr-2" /> Sou Cliente
             </button>
             <button 
-                className={`flex-1 py-2 rounded-lg text-sm font-semibold flex items-center justify-center transition-all ${activeTab === UserType.VENDOR ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'} ${step === 2 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                onClick={() => step === 1 && setActiveTab(UserType.VENDOR)}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold flex items-center justify-center transition-all ${activeTab === UserType.VENDOR ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
+                onClick={() => setActiveTab(UserType.VENDOR)}
             >
                 <Store size={16} className="mr-2" /> Sou Negócio
             </button>
@@ -243,190 +255,182 @@ export const Register: React.FC = () => {
 
         <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 space-y-4">
             
-            {/* STEP 1: AUTHENTICATION */}
-            {step === 1 && (
-                <div className="text-center py-6 animate-fade-in">
-                    <div className="w-16 h-16 bg-sky-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <img 
-                            src="https://cdn-icons-png.flaticon.com/512/2991/2991148.png" 
-                            alt="Google" 
-                            className="w-8 h-8"
-                        />
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-800 mb-2">Autenticação Segura</h3>
-                    <p className="text-gray-500 text-sm mb-6">
-                        Para garantir a segurança da plataforma, o cadastro é realizado <strong>exclusivamente</strong> através da sua Conta Google.
-                    </p>
-                    
-                    <GoogleLoginButton 
-                        text={activeTab === UserType.VENDOR ? "Cadastrar Negócio com Google" : "Cadastrar Cliente com Google"} 
-                        onSuccess={handleGoogleSuccess}
-                    />
+            <form onSubmit={handleRegister} className="animate-slide-up">
+                
+                <h3 className="font-bold text-gray-800 mb-4 border-b pb-2">
+                    {activeTab === UserType.VENDOR ? 'Detalhes do Negócio' : 'Dados Pessoais'}
+                </h3>
+
+                {/* Common Fields */}
+                <Input label={activeTab === UserType.VENDOR ? "Nome do Negócio (Fantasia)" : "Nome Completo"} value={name} onChange={e => setName(e.target.value)} required />
+                <Input label="E-mail de Acesso" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                
+                <div className="grid grid-cols-2 gap-4">
+                    <Input label="Senha" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 dígitos" required />
+                    <Input label="Confirmar Senha" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
                 </div>
-            )}
 
-            {/* STEP 2: DETAILS FORM */}
-            {step === 2 && (
-                <form onSubmit={handleRegister} className="animate-slide-up">
-                    <div className="mb-6 flex items-center gap-3 bg-green-50 p-3 rounded-xl border border-green-100">
-                        {googleData?.photoUrl && (
-                            <img src={googleData.photoUrl} alt="User" className="w-10 h-10 rounded-full border border-green-200" />
-                        )}
-                        <div className="flex-1 overflow-hidden">
-                            <p className="text-xs text-green-700 font-bold uppercase flex items-center gap-1">
-                                <CheckCircle size={10} /> Conta Vinculada
-                            </p>
-                            <p className="text-sm font-semibold text-gray-800 truncate">{googleData?.name}</p>
-                            <p className="text-xs text-gray-500 truncate">{googleData?.email}</p>
+                {/* User Specific */}
+                {activeTab === UserType.USER && (
+                    <Input label="CPF" placeholder="000.000.000-00" value={userCPF} onChange={e => setUserCPF(e.target.value)} required />
+                )}
+
+                {/* Vendor Specific */}
+                {activeTab === UserType.VENDOR && (
+                    <>
+                        <Input label="CNPJ ou CPF (Autônomo)" placeholder="Documento do negócio" value={vendorDoc} onChange={e => setVendorDoc(e.target.value)} required />
+                        <Input label="Telefone / WhatsApp" placeholder="(00) 00000-0000" value={phone} onChange={e => setPhone(e.target.value)} required />
+                        
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Categoria Principal</label>
+                            <select 
+                                className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-primary mb-2"
+                                value={isCustomCategory ? 'OTHER' : category}
+                                onChange={(e) => {
+                                    if (e.target.value === 'OTHER') {
+                                        setIsCustomCategory(true);
+                                        setCategory('');
+                                    } else {
+                                        setIsCustomCategory(false);
+                                        setCategory(e.target.value);
+                                    }
+                                }}
+                            >
+                                {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                <option value="OTHER">+ Outra (Adicionar Nova)</option>
+                            </select>
+                            
+                            {isCustomCategory && (
+                                <div className="animate-fade-in">
+                                    <Input 
+                                        label="Digite a nova categoria" 
+                                        value={customCategory} 
+                                        onChange={e => setCustomCategory(e.target.value)} 
+                                        placeholder="Ex: Pet Shop, Academia..."
+                                        autoFocus
+                                    />
+                                </div>
+                            )}
                         </div>
-                    </div>
 
-                    <h3 className="font-bold text-gray-800 mb-4 border-b pb-2">
-                        {activeTab === UserType.VENDOR ? 'Detalhes do Negócio' : 'Complete seu Perfil'}
-                    </h3>
-
-                    {/* Common Fields */}
-                    {activeTab === UserType.VENDOR && (
-                         <Input label="Nome do Negócio (Fantasia)" value={name} onChange={e => setName(e.target.value)} required />
-                    )}
-                    
-                    {/* User Specific */}
-                    {activeTab === UserType.USER && (
-                        <Input label="CPF" placeholder="000.000.000-00" value={userCPF} onChange={e => setUserCPF(e.target.value)} required />
-                    )}
-
-                    {/* Vendor Specific */}
-                    {activeTab === UserType.VENDOR && (
-                        <>
-                            <Input label="CNPJ ou CPF (Autônomo)" placeholder="Documento do negócio" value={vendorDoc} onChange={e => setVendorDoc(e.target.value)} required />
-                            <Input label="Telefone / WhatsApp" placeholder="(00) 00000-0000" value={phone} onChange={e => setPhone(e.target.value)} required />
-                            
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria Principal</label>
-                                <select 
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-primary mb-2"
-                                    value={isCustomCategory ? 'OTHER' : category}
-                                    onChange={(e) => {
-                                        if (e.target.value === 'OTHER') {
-                                            setIsCustomCategory(true);
-                                            setCategory('');
-                                        } else {
-                                            setIsCustomCategory(false);
-                                            setCategory(e.target.value);
-                                        }
-                                    }}
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Link Principal</label>
+                            <div className="flex rounded-lg shadow-sm">
+                                <select
+                                    value={linkType}
+                                    onChange={(e) => setLinkType(e.target.value)}
+                                    className="px-3 py-2 bg-gray-50 border border-gray-200 border-r-0 rounded-l-lg text-gray-600 text-sm focus:ring-2 focus:ring-primary outline-none cursor-pointer hover:bg-gray-100"
                                 >
-                                    {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                                    <option value="OTHER">+ Outra (Adicionar Nova)</option>
+                                    <option value="Instagram">Instagram</option>
+                                    <option value="Facebook">Facebook</option>
+                                    <option value="Site">Site</option>
                                 </select>
-                                
-                                {isCustomCategory && (
-                                    <div className="animate-fade-in">
-                                        <Input 
-                                            label="Digite a nova categoria" 
-                                            value={customCategory} 
-                                            onChange={e => setCustomCategory(e.target.value)} 
-                                            placeholder="Ex: Pet Shop, Academia..."
-                                            autoFocus
-                                        />
-                                    </div>
-                                )}
+                                <input
+                                    type="text"
+                                    value={linkValue}
+                                    onChange={(e) => setLinkValue(e.target.value)}
+                                    placeholder={linkType === 'Instagram' ? '@seu.perfil' : linkType === 'Facebook' ? 'sua.pagina' : 'www.seusite.com.br'}
+                                    className="flex-1 w-full px-4 py-2 border border-gray-200 rounded-r-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                                />
                             </div>
+                        </div>
+                    </>
+                )}
 
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Link Principal</label>
-                                <div className="flex rounded-lg shadow-sm">
-                                    <select
-                                        value={linkType}
-                                        onChange={(e) => setLinkType(e.target.value)}
-                                        className="px-3 py-2 bg-gray-50 border border-gray-200 border-r-0 rounded-l-lg text-gray-600 text-sm focus:ring-2 focus:ring-primary outline-none cursor-pointer hover:bg-gray-100"
-                                    >
-                                        <option value="Instagram">Instagram</option>
-                                        <option value="Facebook">Facebook</option>
-                                        <option value="Site">Site</option>
-                                    </select>
-                                    <input
-                                        type="text"
-                                        value={linkValue}
-                                        onChange={(e) => setLinkValue(e.target.value)}
-                                        placeholder={linkType === 'Instagram' ? '@seu.perfil' : linkType === 'Facebook' ? 'sua.pagina' : 'www.seusite.com.br'}
-                                        className="flex-1 w-full px-4 py-2 border border-gray-200 rounded-r-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-                                    />
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    <Input label="Endereço Completo" placeholder="Rua, Número, Bairro, Cidade" value={address} onChange={e => setAddress(e.target.value)} required />
-                    
-                    {activeTab === UserType.VENDOR && (
-                        <>
-                            {/* PRIVACY SETTINGS */}
-                            <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
-                                <h4 className="text-sm font-bold text-blue-900 mb-2">Configurações de Privacidade</h4>
-                                <p className="text-xs text-blue-700 mb-3">Escolha quais dados serão visíveis publicamente na busca:</p>
-                                
-                                <div className="space-y-2">
-                                    <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
-                                        <input type="checkbox" checked={showPhone} onChange={e => setShowPhone(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                                        <span>Exibir meu Telefone/WhatsApp</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
-                                        <input type="checkbox" checked={showAddress} onChange={e => setShowAddress(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                                        <span>Exibir meu Endereço no Perfil</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
-                                        <input type="checkbox" checked={showWebsite} onChange={e => setShowWebsite(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                                        <span>Exibir meu Link/Site</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <Input label="Descrição Curta" multiline value={description} onChange={e => setDescription(e.target.value)} />
+                <Input label="Endereço (Rua, Número, Bairro)" placeholder="Ex: Rua XV de Novembro, 100, Centro" value={address} onChange={e => setAddress(e.target.value)} required />
+                
+                {/* Location Restriction Message */}
+                <div className="mb-6 flex items-center gap-2 bg-sky-50 border border-sky-200 p-3 rounded-lg text-sky-800 text-sm font-medium">
+                    <MapPin size={18} className="flex-shrink-0" />
+                    <span>Cidade: <strong>Campo Largo - PR</strong> (Exclusivo)</span>
+                </div>
+                
+                {activeTab === UserType.VENDOR && (
+                    <>
+                        {/* PRIVACY SETTINGS */}
+                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
+                            <h4 className="text-sm font-bold text-blue-900 mb-2">Configurações de Privacidade</h4>
+                            <p className="text-xs text-blue-700 mb-3">Escolha quais dados serão visíveis publicamente na busca:</p>
                             
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Foto do Local</label>
-                                <div 
-                                    onClick={triggerFileInput}
-                                    className={`border-2 border-dashed rounded-lg p-2 text-center cursor-pointer transition-all relative overflow-hidden h-40 flex flex-col items-center justify-center ${photoPreview ? 'border-primary' : 'border-gray-200 hover:bg-gray-50'}`}
-                                >
-                                    {photoPreview ? (
-                                        <>
-                                            <img src={photoPreview} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
-                                            <button 
-                                                onClick={removePhoto}
-                                                className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow hover:bg-red-600 z-10"
-                                            >
-                                                <X size={16} />
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Upload className="mx-auto text-gray-400 mb-2" />
-                                            <span className="text-sm text-gray-500 block">Clique para enviar uma foto</span>
-                                            <span className="text-xs text-gray-400 block mt-1">(JPG, PNG)</span>
-                                        </>
-                                    )}
-                                    <input 
-                                        ref={fileInputRef} 
-                                        type="file" 
-                                        className="hidden" 
-                                        accept="image/*"
-                                        onChange={handlePhotoChange}
-                                    />
-                                </div>
+                            <div className="space-y-2">
+                                <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                                    <input type="checkbox" checked={showPhone} onChange={e => setShowPhone(e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                                    <span>Exibir meu Telefone/WhatsApp</span>
+                                </label>
+                                <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                                    <input type="checkbox" checked={showAddress} onChange={e => setShowAddress(e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                                    <span>Exibir meu Endereço no Perfil</span>
+                                </label>
+                                <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                                    <input type="checkbox" checked={showWebsite} onChange={e => setShowWebsite(e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                                    <span>Exibir meu Link/Site</span>
+                                </label>
                             </div>
-                        </>
-                    )}
+                        </div>
 
-                    <div className="pt-4 flex gap-3">
-                         <Button type="button" variant="outline" onClick={() => setStep(1)} fullWidth>Cancelar</Button>
-                         <Button fullWidth type="submit">
-                            {activeTab === UserType.VENDOR ? 'Concluir Cadastro' : 'Finalizar'}
-                         </Button>
-                    </div>
-                </form>
-            )}
+                        <Input label="Descrição Curta" multiline value={description} onChange={e => setDescription(e.target.value)} />
+                        
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Foto do Local ou Perfil</label>
+                            <div 
+                                onClick={triggerFileInput}
+                                className={`border-2 border-dashed rounded-lg p-2 text-center cursor-pointer transition-all relative overflow-hidden h-40 flex flex-col items-center justify-center ${photoPreview ? 'border-primary' : 'border-gray-200 hover:bg-gray-50'}`}
+                            >
+                                {photoPreview ? (
+                                    <>
+                                        <img src={photoPreview} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
+                                        <button 
+                                            onClick={removePhoto}
+                                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow hover:bg-red-600 z-10"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Upload className="mx-auto text-gray-400 mb-2" />
+                                        <span className="text-sm text-gray-500 block">Clique para enviar uma foto</span>
+                                        <span className="text-xs text-gray-400 block mt-1">(JPG, PNG)</span>
+                                    </>
+                                )}
+                                <input 
+                                    ref={fileInputRef} 
+                                    type="file" 
+                                    className="hidden" 
+                                    accept="image/*"
+                                    onChange={handlePhotoChange}
+                                />
+                            </div>
+                        </div>
+                    </>
+                )}
+                
+                {activeTab === UserType.USER && (
+                     <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Foto de Perfil (Opcional)</label>
+                        <div 
+                            onClick={triggerFileInput}
+                            className={`border-2 border-dashed rounded-lg p-2 text-center cursor-pointer transition-all relative overflow-hidden h-24 flex flex-col items-center justify-center ${photoPreview ? 'border-primary' : 'border-gray-200 hover:bg-gray-50'}`}
+                        >
+                            {photoPreview ? (
+                                <>
+                                    <img src={photoPreview} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
+                                    <button onClick={removePhoto} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow z-10"><X size={14} /></button>
+                                </>
+                            ) : (
+                                <div className="flex items-center gap-2 text-gray-400">
+                                    <Upload size={20} /> <span className="text-sm">Enviar Foto</span>
+                                </div>
+                            )}
+                            <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handlePhotoChange}/>
+                        </div>
+                     </div>
+                )}
+
+                <Button fullWidth type="submit" className="mt-4">
+                    {activeTab === UserType.VENDOR ? 'Cadastrar Comércio' : 'Criar Conta'}
+                </Button>
+            </form>
         </div>
       </div>
     </div>

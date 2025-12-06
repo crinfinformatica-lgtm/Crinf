@@ -15,16 +15,8 @@ export const MASTER_USER: User = {
 // Dados Iniciais (Seed)
 export const INITIAL_DB: Partial<AppState> = {
   users: [
-    MASTER_USER,
-    { 
-      id: 'user_demo_1', 
-      name: 'Maria Silva', 
-      email: 'maria@email.com', 
-      cpf: '111.111.111-11', 
-      address: 'Centro, Campo Largo', 
-      type: UserType.USER, 
-      password: '123' 
-    }
+    MASTER_USER
+    // Usuários de teste removidos conforme solicitação
   ],
   vendors: [
     {
