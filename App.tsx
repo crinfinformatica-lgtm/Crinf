@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2 } from 'lucide-react';
+import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy } from 'lucide-react';
 import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum } from './types';
 import { getUserLocation, calculateDistance } from './services/geoService';
 import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo } from './components/UI';
@@ -460,6 +460,8 @@ const AdminLogin: React.FC = () => {
     const [isForgotModalOpen, setForgotModalOpen] = useState(false);
     const [forgotEmail, setForgotEmail] = useState('');
     const [isEmailSent, setIsEmailSent] = useState(false);
+    
+    const resetLink = window.location.href.split('#')[0] + '#/reset-password?email=' + encodeURIComponent(forgotEmail);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -500,6 +502,24 @@ const AdminLogin: React.FC = () => {
             alert("Digite um e-mail válido.");
             return;
         }
+
+        // --- EMAILJS INTEGRATION ---
+        const emailjs = (window as any).emailjs;
+        if (emailjs) {
+             const templateParams = {
+                to_email: forgotEmail,
+                reset_link: window.location.href.split('#')[0] + '#/reset-password?email=' + encodeURIComponent(forgotEmail)
+            };
+            
+            // Using provided Service ID: service_dtvvjp8
+            // You still need Template ID and Public Key for it to work fully
+            emailjs.send('service_dtvvjp8', 'template_id_placeholder', templateParams, 'public_key_placeholder')
+                .then(() => {
+                    console.log("Email sent via EmailJS");
+                })
+                .catch((err: any) => console.error("EmailJS Error:", err));
+        }
+
         setIsEmailSent(true);
     };
 
@@ -594,15 +614,24 @@ const AdminLogin: React.FC = () => {
                         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 mb-2">
                             <CheckCircle size={32} />
                         </div>
-                        <h3 className="text-lg font-bold text-gray-800">Link Enviado!</h3>
+                        <h3 className="text-lg font-bold text-gray-800">Link Gerado!</h3>
                         <p className="text-sm text-gray-600">
-                            Um link seguro para redefinição de senha foi enviado para <strong>{forgotEmail}</strong>.
+                            Como este é um ambiente <strong>sem servidor de e-mail</strong>, clique no link abaixo para prosseguir:
                         </p>
-                        <p className="text-xs text-gray-500">
-                            Acesse seu e-mail e siga as instruções para criar uma nova senha.
-                        </p>
+                        
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 break-all font-mono text-xs text-blue-600 mb-2">
+                            {resetLink}
+                        </div>
+
+                        <Button fullWidth onClick={() => {
+                            window.location.href = resetLink;
+                            setForgotModalOpen(false);
+                        }}>
+                            Abrir Link de Redefinição
+                        </Button>
+
                         <div className="mt-6">
-                            <Button fullWidth onClick={() => setForgotModalOpen(false)}>
+                            <Button fullWidth variant="outline" onClick={() => setForgotModalOpen(false)}>
                                 Fechar
                             </Button>
                         </div>
@@ -695,6 +724,9 @@ const Login: React.FC = () => {
         }
         setIsEmailSent(true);
     };
+    
+    // Standard User Reset Link logic
+    const userResetLink = window.location.href.split('#')[0] + '#/reset-password?email=' + encodeURIComponent(forgotEmail);
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-100 via-white to-sky-50 max-w-md mx-auto relative overflow-hidden">
@@ -764,14 +796,21 @@ const Login: React.FC = () => {
                         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 mb-2">
                             <CheckCircle size={32} />
                         </div>
-                        <h3 className="text-lg font-bold text-gray-800">E-mail Enviado!</h3>
-                        <p className="text-sm text-gray-500">Verifique sua caixa de entrada.</p>
-                        <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                            <p className="text-xs text-gray-400 uppercase font-bold mb-2 tracking-wider">Simulação de E-mail</p>
-                            <button onClick={() => { setForgotModalOpen(false); navigate(`/reset-password?email=${encodeURIComponent(forgotEmail)}`); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 flex items-center justify-center w-full gap-2">
-                                Definir Nova Senha <ArrowRight size={16}/>
-                            </button>
+                        <h3 className="text-lg font-bold text-gray-800">Link Gerado!</h3>
+                        <p className="text-sm text-gray-500">
+                           Para fins de teste (sem servidor de e-mail), use o link abaixo:
+                        </p>
+                        
+                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 break-all font-mono text-xs text-blue-600 mb-2">
+                            {userResetLink}
                         </div>
+
+                        <Button fullWidth onClick={() => {
+                            window.location.href = userResetLink;
+                            setForgotModalOpen(false);
+                        }}>
+                             Definir Nova Senha
+                        </Button>
                     </div>
                 )}
             </Modal>

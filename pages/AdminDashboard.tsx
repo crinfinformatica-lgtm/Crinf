@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle } from 'lucide-react';
+import { Shield, User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, LogOut } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Button, Input, Modal, TwoFactorModal, AdminLogo } from '../components/UI';
 import { UserType, User as IUser, Vendor } from '../types';
@@ -151,6 +151,13 @@ export const AdminDashboard: React.FC = () => {
       setNewUserEmail('');
   };
 
+  const handleLogout = () => {
+    if(confirm("Deseja desconectar do painel administrativo?")) {
+        dispatch({ type: 'LOGOUT' });
+        navigate('/');
+    }
+  };
+
   const copyLink = () => {
       const url = window.location.href.replace('#/admin', '');
       navigator.clipboard.writeText(url);
@@ -179,12 +186,7 @@ export const AdminDashboard: React.FC = () => {
                     </p>
                 </div>
             </div>
-            <button 
-                onClick={() => navigate('/settings')}
-                className="bg-slate-800 hover:bg-slate-700 p-2 rounded-lg text-slate-300 transition-colors"
-            >
-                Sair
-            </button>
+            {/* Header 'Sair' removed or kept as redundancy, keeping logic consistent */}
         </div>
 
         {/* Navigation Tabs - Changed to flex-wrap to ensure visibility on all screens */}
@@ -204,6 +206,14 @@ export const AdminDashboard: React.FC = () => {
                     <span>{tab.label}</span>
                 </button>
             ))}
+            
+            <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap bg-red-900/20 text-red-400 hover:bg-red-900/40 border border-red-900/30 flex-grow sm:flex-grow-0 justify-center"
+            >
+                <LogOut size={16} />
+                <span>Sair</span>
+            </button>
         </div>
       </div>
 

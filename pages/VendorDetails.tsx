@@ -38,6 +38,13 @@ export const VendorDetails: React.FC = () => {
         return;
     }
 
+    // CHECK: Only USER type can review
+    if (state.currentUser.type !== UserType.USER) {
+        alert("Apenas usuários do tipo Cliente podem realizar avaliações.");
+        setShowReviewForm(false);
+        return;
+    }
+
     const newReview = {
         id: Date.now().toString(),
         userId: state.currentUser.id,
@@ -73,6 +80,9 @@ export const VendorDetails: React.FC = () => {
       state.currentUser.type === UserType.ADMIN || 
       state.currentUser.type === UserType.MASTER
   );
+
+  // Check if user is strictly a CLIENT (UserType.USER) to allow reviewing
+  const canReview = state.currentUser && state.currentUser.type === UserType.USER;
 
   return (
     <div className="bg-gradient-to-br from-sky-100 via-white to-sky-50 min-h-screen pb-24 relative">
@@ -164,10 +174,17 @@ export const VendorDetails: React.FC = () => {
         <section>
             <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold text-gray-900 text-lg">Avaliações</h3>
-                {state.currentUser && !showReviewForm && (
+                
+                {/* Only show 'Avaliar' button if user is strictly a CLIENT (UserType.USER) */}
+                {canReview && !showReviewForm && (
                      <button onClick={() => setShowReviewForm(true)} className="text-primary text-sm font-semibold hover:underline">
                          Avaliar
                      </button>
+                )}
+                {!state.currentUser && (
+                    <button onClick={() => navigate('/login')} className="text-primary text-sm font-semibold hover:underline">
+                        Faça login para avaliar
+                    </button>
                 )}
             </div>
 
