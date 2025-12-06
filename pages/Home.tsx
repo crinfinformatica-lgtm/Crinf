@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, MapPin, Filter, Store, UserPlus, Navigation } from 'lucide-react';
+import { Search, MapPin, Filter, Store, UserPlus, Navigation, Share2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Vendor, CATEGORIES } from '../types';
 import { VendorCard, Button } from '../components/UI';
@@ -91,6 +91,25 @@ export const Home: React.FC = () => {
     setIsSearching(false);
   };
 
+  const handleShareApp = async () => {
+    const shareData = {
+        title: 'O Que Tem Perto?',
+        text: 'Descubra os melhores comércios e serviços de Campo Largo no app O Que Tem Perto!',
+        url: window.location.href.split('#')[0]
+    };
+
+    if (navigator.share) {
+        try {
+            await navigator.share(shareData);
+        } catch (err) {
+            console.log('Error sharing', err);
+        }
+    } else {
+        navigator.clipboard.writeText(shareData.url);
+        alert('Link do aplicativo copiado para a área de transferência!');
+    }
+  };
+
   const filteredVendors = state.vendors.filter(v => {
     const matchesCategory = state.selectedCategory 
       ? v.categories.some(c => c.toLowerCase().includes(state.selectedCategory!.toLowerCase()))
@@ -146,6 +165,15 @@ export const Home: React.FC = () => {
                     >
                         <Store size={24} className="text-sky-500 relative z-10" />
                         <span className="relative z-10">Cadastrar Negócio</span>
+                    </button>
+
+                    {/* Botão de Compartilhar App */}
+                    <button 
+                        onClick={handleShareApp}
+                        className="w-full text-sky-600 font-semibold py-3 px-6 rounded-2xl flex items-center justify-center gap-2 hover:bg-sky-50 transition-colors"
+                    >
+                        <Share2 size={18} />
+                        Compartilhar App
                     </button>
                 </div>
             </div>

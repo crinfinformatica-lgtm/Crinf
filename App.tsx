@@ -1,6 +1,7 @@
+
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound } from 'lucide-react';
+import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2 } from 'lucide-react';
 import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum } from './types';
 import { getUserLocation, calculateDistance } from './services/geoService';
 import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo } from './components/UI';
@@ -334,6 +335,25 @@ const SettingsPage: React.FC = () => {
         }
     };
 
+    const handleShareApp = async () => {
+        const shareData = {
+            title: 'O Que Tem Perto?',
+            text: 'Descubra os melhores comércios e serviços de Campo Largo no app O Que Tem Perto!',
+            url: window.location.href.split('#')[0]
+        };
+    
+        if (navigator.share) {
+            try {
+                await navigator.share(shareData);
+            } catch (err) {
+                console.log('Error sharing', err);
+            }
+        } else {
+            navigator.clipboard.writeText(shareData.url);
+            alert('Link do aplicativo copiado para a área de transferência!');
+        }
+    };
+
     const isAdminOrMaster = state.currentUser?.type === UserEnum.ADMIN || state.currentUser?.type === UserEnum.MASTER;
 
     return (
@@ -397,6 +417,18 @@ const SettingsPage: React.FC = () => {
                             <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
                         </div>
                     </div>
+                    
+                    <div 
+                        onClick={handleShareApp}
+                        className="p-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+                    >
+                        <div className="flex items-center gap-3">
+                            <Share2 size={20} className="text-gray-400" />
+                            <span className="text-gray-700 font-medium">Compartilhar App</span>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-300" />
+                    </div>
+
                     <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50">
                         <div className="flex items-center gap-3">
                             <Moon size={20} className="text-gray-400" />
