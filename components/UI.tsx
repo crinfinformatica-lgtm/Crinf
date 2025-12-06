@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Star, MapPin, Phone, MessageCircle, X, ShieldCheck, Smartphone, Mail } from 'lucide-react';
+import { Star, MapPin, Phone, MessageCircle, X, ShieldCheck, Smartphone, Mail, Share2, Copy, Check } from 'lucide-react';
 import { Vendor } from '../types';
 
 // --- Star Rating ---
@@ -83,36 +83,6 @@ export const Input: React.FC<InputProps> = ({ label, error, multiline, className
   );
 };
 
-// --- Vendor Card ---
-export const VendorCard: React.FC<{ vendor: Vendor; onClick: () => void }> = ({ vendor, onClick }) => {
-  return (
-    <div 
-      onClick={onClick}
-      className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer mb-4"
-    >
-      <div className="relative h-32 bg-gray-200">
-        <img src={vendor.photoUrl} alt={vendor.name} className="w-full h-full object-cover" />
-        <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-bold text-gray-700 shadow-sm">
-          {vendor.distance?.toFixed(1) || Math.floor(Math.random() * 5 + 1)} km
-        </div>
-      </div>
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-1">
-          <h3 className="font-bold text-gray-900 text-lg truncate pr-2">{vendor.name}</h3>
-        </div>
-        <p className="text-xs text-primary font-medium mb-2 uppercase tracking-wide">
-          {vendor.categories[0]}
-        </p>
-        <StarRating rating={vendor.rating} count={vendor.reviewCount} />
-        <div className="mt-3 flex items-center text-gray-500 text-sm">
-          <MapPin size={14} className="mr-1 flex-shrink-0" />
-          <span className="truncate">{vendor.address}</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // --- Modal ---
 interface ModalProps {
   isOpen: boolean;
@@ -138,6 +108,108 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
         </div>
       </div>
     </div>
+  );
+};
+
+// --- Vendor Card ---
+export const VendorCard: React.FC<{ vendor: Vendor; onClick: () => void }> = ({ vendor, onClick }) => {
+  const [isShareOpen, setShareOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleShareClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShareOpen(true);
+  };
+
+  const getShareLink = () => {
+    const baseUrl = window.location.href.split('#')[0];
+    return `${baseUrl}#/vendor/${vendor.id}`;
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(getShareLink());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleWhatsAppShare = () => {
+    const link = getShareLink();
+    const text = `Confira *${vendor.name}* no app O Que Tem Perto! \n${link}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  return (
+    <>
+      <div 
+        onClick={onClick}
+        className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer mb-4 relative group"
+      >
+        <div className="relative h-32 bg-gray-200">
+          <img src={vendor.photoUrl} alt={vendor.name} className="w-full h-full object-cover" />
+          
+          {/* Distance Badge - Moved to Left */}
+          <div className="absolute top-2 left-2 bg-black/50 backdrop-blur-sm px-2 py-1 rounded-full text-[10px] font-bold text-white shadow-sm flex items-center gap-1">
+            <MapPin size={10} />
+            {vendor.distance?.toFixed(1) || Math.floor(Math.random() * 5 + 1)} km
+          </div>
+
+          {/* Share Button - Added to Right */}
+          <button 
+            onClick={handleShareClick}
+            className="absolute top-2 right-2 bg-white p-2 rounded-full text-gray-700 shadow-md hover:bg-sky-50 hover:text-primary transition-colors active:scale-95"
+          >
+            <Share2 size={16} />
+          </button>
+        </div>
+        <div className="p-4">
+          <div className="flex justify-between items-start mb-1">
+            <h3 className="font-bold text-gray-900 text-lg truncate pr-2">{vendor.name}</h3>
+          </div>
+          <p className="text-xs text-primary font-medium mb-2 uppercase tracking-wide">
+            {vendor.categories[0]}
+          </p>
+          <StarRating rating={vendor.rating} count={vendor.reviewCount} />
+          <div className="mt-3 flex items-center text-gray-500 text-sm">
+            <MapPin size={14} className="mr-1 flex-shrink-0" />
+            <span className="truncate">{vendor.address}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Share Modal */}
+      {isShareOpen && (
+        <div onClick={(e) => e.stopPropagation()}>
+           <Modal isOpen={isShareOpen} onClose={() => setShareOpen(false)} title="Compartilhar">
+              <div className="space-y-4">
+                 <div className="text-center mb-4">
+                    <img src={vendor.photoUrl} alt={vendor.name} className="w-16 h-16 rounded-full mx-auto mb-2 object-cover border-2 border-white shadow" />
+                    <h4 className="font-bold text-gray-800">{vendor.name}</h4>
+                    <p className="text-xs text-gray-500">Compartilhe este negócio com seus amigos</p>
+                 </div>
+
+                 <Button 
+                    variant="outline" 
+                    fullWidth 
+                    onClick={handleCopyLink}
+                    icon={copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+                    className={copied ? "border-green-500 text-green-600 bg-green-50" : ""}
+                 >
+                    {copied ? "Link Copiado!" : "Copiar Link"}
+                 </Button>
+
+                 <Button 
+                    fullWidth 
+                    onClick={handleWhatsAppShare}
+                    icon={<MessageCircle size={18} />}
+                    className="bg-[#25D366] hover:bg-[#128C7E] text-white shadow-none border-none"
+                 >
+                    Enviar via WhatsApp
+                 </Button>
+              </div>
+           </Modal>
+        </div>
+      )}
+    </>
   );
 };
 
