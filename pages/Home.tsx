@@ -1,0 +1,263 @@
+
+import React, { useState, useEffect } from 'react';
+import { Search, MapPin, Filter, Store, UserPlus, Navigation } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Vendor, CATEGORIES } from '../types';
+import { VendorCard, Button } from '../components/UI';
+import { useAppContext } from '../App';
+import { interpretSearchQuery } from '../services/geminiService';
+
+// Custom Logo Component - Replica of the provided image "O QUE TEM PERTO?"
+const AppLogo = () => (
+  <svg viewBox="0 0 200 200" className="w-64 h-64 drop-shadow-xl animate-fade-in">
+    <defs>
+      <path id="curveTop" d="M 24,100 A 76,76 0 0,1 176,100" />
+    </defs>
+    
+    {/* Outer Border Circle */}
+    <circle cx="100" cy="100" r="98" fill="#1e3a8a" /> 
+
+    {/* Top Half - Blue */}
+    <path d="M 5,100 A 95,95 0 0,1 195,100 L 195,100 L 5,100 Z" fill="#60a5fa" />
+    
+    {/* Bottom Half - Yellow */}
+    <path d="M 5,100 A 95,95 0 0,0 195,100 L 195,100 L 5,100 Z" fill="#fcd34d" />
+    
+    {/* Horizontal Divider Line */}
+    <line x1="5" y1="100" x2="195" y2="100" stroke="#1e3a8a" strokeWidth="3" />
+
+    {/* Top Text - Curved */}
+    <text width="200" textAnchor="middle" fontSize="16" fontWeight="900" fill="white" letterSpacing="2" style={{ fontFamily: 'Arial Black, sans-serif' }}>
+       <textPath href="#curveTop" startOffset="50%" textAnchor="middle">
+         O QUE TEM PERTO?
+       </textPath>
+    </text>
+
+    {/* Center Graphic */}
+    <g transform="translate(100, 95)">
+       {/* "CL" Text - Now Uppercase */}
+       <text x="0" y="25" textAnchor="middle" fontSize="65" fontWeight="900" fill="white" stroke="#1e3a8a" strokeWidth="2.5" style={{ fontFamily: 'Arial, sans-serif' }}>
+         CL
+       </text>
+    </g>
+
+    {/* Bottom Text - City */}
+    <text x="100" y="138" textAnchor="middle" fontSize="13" fontWeight="800" fill="#1e3a8a" letterSpacing="0.5">
+        CAMPO LARGO/PR
+    </text>
+
+    {/* Bottom Icons - Unified Store/Service Icon */}
+    <g transform="translate(100, 165)" fill="none" stroke="#1e3a8a" strokeWidth="2">
+        {/* Awning */}
+        <path d="M -18,-6 L 18,-6 L 14,-14 L -14,-14 Z" strokeLinejoin="round" fill="#60a5fa" fillOpacity="0.3" />
+        {/* Building Base */}
+        <rect x="-14" y="-6" width="28" height="14" fill="white" fillOpacity="0.2" />
+        {/* Door */}
+        <rect x="-4" y="1" width="8" height="7" />
+        {/* Details on Awning */}
+        <path d="M -7,-14 L -9,-6 M 0,-14 L 0,-6 M 7,-14 L 9,-6" opacity="0.5" />
+    </g>
+  </svg>
+);
+
+export const Home: React.FC = () => {
+  const { state, dispatch } = useAppContext();
+  const navigate = useNavigate();
+  const [localSearch, setLocalSearch] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [viewMode, setViewMode] = useState<'landing' | 'search'>('landing');
+
+  // Logic to determine if we should stay in search mode if there's an active query
+  useEffect(() => {
+    if (state.searchQuery || state.selectedCategory) {
+        setViewMode('search');
+    }
+  }, [state.searchQuery, state.selectedCategory]);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSearching(true);
+    
+    // Smart search using Gemini
+    if (localSearch.length > 2) {
+      const result = await interpretSearchQuery(localSearch);
+      if (result.category) {
+        dispatch({ type: 'SET_CATEGORY', payload: result.category });
+      }
+      dispatch({ type: 'SET_SEARCH', payload: localSearch });
+    } else {
+        dispatch({ type: 'SET_SEARCH', payload: localSearch });
+    }
+    setIsSearching(false);
+  };
+
+  const filteredVendors = state.vendors.filter(v => {
+    const matchesCategory = state.selectedCategory 
+      ? v.categories.some(c => c.toLowerCase().includes(state.selectedCategory!.toLowerCase()))
+      : true;
+    
+    const matchesSearch = state.searchQuery 
+      ? v.name.toLowerCase().includes(state.searchQuery.toLowerCase()) || 
+        v.description.toLowerCase().includes(state.searchQuery.toLowerCase())
+      : true;
+
+    return matchesCategory && matchesSearch;
+  });
+
+  const goHome = () => {
+      dispatch({ type: 'SET_CATEGORY', payload: null });
+      dispatch({ type: 'SET_SEARCH', payload: '' });
+      setLocalSearch('');
+      setViewMode('landing');
+  }
+
+  // --- VIEW: LANDING PAGE ---
+  if (viewMode === 'landing') {
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-sky-100 via-white to-sky-50 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+            {/* Background Decorative Elements */}
+            <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-sky-200/40 rounded-full blur-3xl"></div>
+            <div className="absolute bottom-[-10%] left-[-10%] w-80 h-80 bg-blue-200/30 rounded-full blur-2xl"></div>
+
+            <div className="z-10 w-full flex flex-col items-center text-center">
+                {/* Logo Area */}
+                <div className="mb-4 transform hover:scale-105 transition-transform duration-500">
+                    <AppLogo />
+                </div>
+                
+                <p className="text-gray-500 mb-10 text-sm max-w-xs mx-auto font-medium">
+                    Descubra os melhores serviços e comércios de Campo Largo em um só lugar.
+                </p>
+                
+                {/* Main Action Buttons */}
+                <div className="w-full space-y-4 max-w-sm">
+                    <button 
+                        onClick={() => setViewMode('search')}
+                        className="group w-full bg-primary hover:bg-sky-600 text-white font-bold text-lg py-4 px-6 rounded-2xl shadow-lg shadow-sky-200 transform transition active:scale-95 flex items-center justify-center gap-3 border-b-4 border-sky-700 relative overflow-hidden"
+                    >
+                        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                        <Search size={24} className="text-white relative z-10" />
+                        <span className="relative z-10">Explorar Agora</span>
+                    </button>
+
+                    <button 
+                        onClick={() => navigate('/register')}
+                        className="group w-full bg-white hover:bg-gray-50 text-sky-700 font-bold text-lg py-4 px-6 rounded-2xl shadow-md transform transition active:scale-95 flex items-center justify-center gap-3 border border-sky-100"
+                    >
+                        <Store size={24} className="text-sky-500 relative z-10" />
+                        <span className="relative z-10">Cadastrar Negócio</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+  }
+
+  // --- VIEW: SEARCH & RESULTS PAGE ---
+  return (
+    <div className="pb-20 bg-transparent min-h-screen">
+      {/* Header / Search Area */}
+      <div className="bg-white/80 backdrop-blur-md pt-6 pb-6 px-4 rounded-b-[2.5rem] shadow-lg mb-6 sticky top-0 z-40 border-b border-sky-100">
+        <div className="flex justify-between items-center mb-6">
+            <div className="cursor-pointer" onClick={goHome}>
+                <h1 className="text-xl font-extrabold tracking-tight text-sky-900">O Que Tem Perto?</h1>
+                <p className="text-sky-600 text-xs flex items-center font-medium bg-sky-50 inline-block px-2 py-0.5 rounded-md mt-1 border border-sky-100">
+                    <MapPin size={10} className="mr-1" /> Campo Largo/PR
+                </p>
+            </div>
+            {!state.currentUser && (
+                <button 
+                  onClick={() => navigate('/login')}
+                  className="text-xs font-bold bg-primary text-white px-5 py-2 rounded-full hover:bg-sky-600 shadow-sm transition-colors"
+                >
+                    Entrar
+                </button>
+            )}
+            {state.currentUser && (
+                <div className="h-10 w-10 rounded-full bg-accent border-2 border-white flex items-center justify-center text-sky-900 font-bold shadow-md overflow-hidden cursor-pointer hover:scale-105 transition-transform" onClick={() => navigate('/settings')}>
+                    {state.currentUser.photoUrl ? (
+                        <img src={state.currentUser.photoUrl} alt="User" className="w-full h-full object-cover" />
+                    ) : (
+                        state.currentUser.name[0]
+                    )}
+                </div>
+            )}
+        </div>
+
+        <form onSubmit={handleSearch} className="relative">
+          <input
+            type="text"
+            placeholder="Buscar em Campo Largo..."
+            className="w-full pl-12 pr-4 py-4 rounded-2xl bg-gray-50 text-gray-900 shadow-inner border border-gray-200 focus:border-primary focus:ring-2 focus:ring-sky-100 focus:outline-none placeholder-gray-400 transition-all"
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+          />
+          <Search className="absolute left-4 top-4 text-gray-400" size={20} />
+          <button type="submit" className="absolute right-3 top-3 bg-primary p-1.5 rounded-xl text-white shadow-sm hover:bg-sky-600 transition-colors">
+            {isSearching ? <div className="animate-spin h-5 w-5 border-2 border-white rounded-full border-t-transparent" /> : <Search size={20} />}
+          </button>
+        </form>
+      </div>
+
+      {/* Categories */}
+      <div className="px-4 mb-6">
+        <div className="flex justify-between items-end mb-3">
+            <h2 className="text-sky-900 font-bold text-lg">Categorias</h2>
+            <button 
+                onClick={() => dispatch({ type: 'SET_CATEGORY', payload: null })}
+                className="text-xs text-primary font-semibold underline"
+            >
+                Ver tudo
+            </button>
+        </div>
+        <div className="flex space-x-3 overflow-x-auto no-scrollbar pb-2">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat}
+              onClick={() => dispatch({ type: 'SET_CATEGORY', payload: cat })}
+              className={`flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold transition-all transform hover:scale-105 ${state.selectedCategory === cat ? 'bg-primary text-white shadow-lg shadow-sky-200' : 'bg-white text-gray-500 border border-gray-100 shadow-sm hover:border-primary/30'}`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Results */}
+      <div className="px-4">
+        <div className="flex justify-between items-center mb-3">
+            <h2 className="text-sky-900 font-bold text-lg">
+                {state.selectedCategory ? `${state.selectedCategory} em Campo Largo` : 'Destaques da Cidade'}
+            </h2>
+            {state.userLocation && (
+                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-full flex items-center font-bold">
+                    <Navigation size={10} className="mr-1 fill-green-700" /> GPS Ativo
+                </span>
+            )}
+        </div>
+        
+        {filteredVendors.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-3xl border border-sky-100 p-8 shadow-sm mx-2">
+            <div className="bg-sky-50 rounded-full h-20 w-20 flex items-center justify-center mx-auto mb-4">
+                <Search className="text-primary" size={32}/>
+            </div>
+            <p className="text-gray-500 font-medium">Nenhum resultado encontrado.</p>
+            <Button variant="outline" className="mt-6 border-primary text-primary" onClick={() => {
+                dispatch({ type: 'SET_CATEGORY', payload: null });
+                dispatch({ type: 'SET_SEARCH', payload: '' });
+                setLocalSearch('');
+            }}>Limpar Filtros</Button>
+          </div>
+        ) : (
+          filteredVendors.map(vendor => (
+            <VendorCard 
+              key={vendor.id} 
+              vendor={vendor} 
+              onClick={() => navigate(`/vendor/${vendor.id}`)} 
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+};

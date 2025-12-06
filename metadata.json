@@ -1,0 +1,7 @@
+{
+  "name": "O Que Tem Perto?",
+  "description": "Guia exclusivo de comércios e serviços de Campo Largo/PR.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
