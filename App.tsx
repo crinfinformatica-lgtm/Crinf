@@ -1,29 +1,49 @@
-
-import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Home, User, Settings, PlusCircle, Instagram, Globe, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Download, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound } from 'lucide-react';
+import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound } from 'lucide-react';
 import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum } from './types';
-import { Home as HomePage } from './pages/Home';
-import { VendorDetails } from './pages/VendorDetails';
-import { Register } from './pages/Register';
-import { AdminDashboard } from './pages/AdminDashboard';
-import { generateMockVendors } from './services/geminiService';
 import { getUserLocation, calculateDistance } from './services/geoService';
-import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo } from './components/UI'; // Imported AdminLogo
+import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo } from './components/UI';
+import { INITIAL_DB } from './database';
+
+// --- Lazy Loading Pages (Code Splitting) ---
+// Isso resolve o aviso "Chunk Size Limit" carregando as páginas sob demanda
+const HomePage = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })));
+const VendorDetails = lazy(() => import('./pages/VendorDetails').then(module => ({ default: module.VendorDetails })));
+const Register = lazy(() => import('./pages/Register').then(module => ({ default: module.Register })));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
+
+// --- Loading Component ---
+const PageLoader = () => (
+  <div className="min-h-screen flex flex-col items-center justify-center bg-sky-50">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+    <p className="text-sky-600 font-semibold animate-pulse">Carregando...</p>
+  </div>
+);
 
 // --- State Management ---
-const initialState: AppState = {
-  currentUser: null,
-  users: [
-    // Mock Users for Demo purposes allowing password changes
-    { id: 'user_1', name: 'Maria Silva', email: 'maria@email.com', cpf: '111.111.111-11', address: 'Centro', type: UserEnum.USER, password: '123' } as any
-  ],
-  vendors: [],
-  bannedDocuments: [],
-  searchQuery: '',
-  selectedCategory: null,
-  userLocation: null
+const loadStateFromStorage = (): AppState => {
+  try {
+    const saved = localStorage.getItem('cl_perto_db_v1');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error("Failed to load state", e);
+  }
+  // Fallback to Initial DB
+  return {
+    currentUser: null,
+    users: INITIAL_DB.users || [],
+    vendors: INITIAL_DB.vendors || [],
+    bannedDocuments: INITIAL_DB.bannedDocuments || [],
+    searchQuery: '',
+    selectedCategory: null,
+    userLocation: null
+  };
 };
+
+const initialState: AppState = loadStateFromStorage();
 
 type Action = 
   | { type: 'SET_VENDORS'; payload: Vendor[] }
@@ -46,45 +66,57 @@ type Action =
   | { type: 'CHANGE_PASSWORD'; payload: { email: string; newPass: string } };
 
 const reducer = (state: AppState, action: Action): AppState => {
+  let newState = state;
   switch (action.type) {
     case 'SET_VENDORS':
-      return { ...state, vendors: action.payload };
+      newState = { ...state, vendors: action.payload };
+      break;
     case 'ADD_VENDOR':
-      return { ...state, vendors: [action.payload, ...state.vendors] };
+      newState = { ...state, vendors: [action.payload, ...state.vendors] };
+      break;
     case 'ADD_USER':
-      return { ...state, users: [...state.users, action.payload] };
+      newState = { ...state, users: [...state.users, action.payload] };
+      break;
     case 'UPDATE_USER':
-      return { ...state, users: state.users.map(u => u.id === action.payload.id ? action.payload : u) };
+      newState = { ...state, users: state.users.map(u => u.id === action.payload.id ? action.payload : u) };
+      break;
     case 'UPDATE_VENDOR':
-      return { ...state, vendors: state.vendors.map(v => v.id === action.payload.id ? { ...v, ...action.payload } : v) };
+      newState = { ...state, vendors: state.vendors.map(v => v.id === action.payload.id ? { ...v, ...action.payload } : v) };
+      break;
     case 'DELETE_USER':
-      return { ...state, users: state.users.filter(u => u.id !== action.payload) };
+      newState = { ...state, users: state.users.filter(u => u.id !== action.payload) };
+      break;
     case 'DELETE_VENDOR':
-      return { ...state, vendors: state.vendors.filter(v => v.id !== action.payload) };
+      newState = { ...state, vendors: state.vendors.filter(v => v.id !== action.payload) };
+      break;
     case 'BAN_DOCUMENT':
-      // Payload can be Email, CPF, or CNPJ
-      return { 
+      newState = { 
         ...state, 
         bannedDocuments: [...state.bannedDocuments, action.payload],
-        // Remove users if CPF OR Email matches the banned string
         users: state.users.filter(u => u.cpf !== action.payload && u.email !== action.payload),
-        // Remove vendors if Document (CNPJ/CPF) matches
         vendors: state.vendors.filter(v => v.document !== action.payload)
       };
+      break;
     case 'UNBAN_DOCUMENT':
-      return { ...state, bannedDocuments: state.bannedDocuments.filter(d => d !== action.payload) };
+      newState = { ...state, bannedDocuments: state.bannedDocuments.filter(d => d !== action.payload) };
+      break;
     case 'LOGIN':
-      return { ...state, currentUser: action.payload };
+      newState = { ...state, currentUser: action.payload };
+      break;
     case 'LOGOUT':
-      return { ...state, currentUser: null };
+      newState = { ...state, currentUser: null };
+      break;
     case 'SET_SEARCH':
-      return { ...state, searchQuery: action.payload };
+      newState = { ...state, searchQuery: action.payload };
+      break;
     case 'SET_CATEGORY':
-      return { ...state, selectedCategory: action.payload };
+      newState = { ...state, selectedCategory: action.payload };
+      break;
     case 'SET_LOCATION':
-      return { ...state, userLocation: action.payload };
+      newState = { ...state, userLocation: action.payload };
+      break;
     case 'ADD_REVIEW':
-      return {
+      newState = {
         ...state,
         vendors: state.vendors.map(v => {
           if (v.id === action.payload.vendorId) {
@@ -96,8 +128,9 @@ const reducer = (state: AppState, action: Action): AppState => {
           return v;
         })
       };
+      break;
     case 'REPLY_REVIEW':
-      return {
+      newState = {
           ...state,
           vendors: state.vendors.map(v => {
               if (v.id === action.payload.vendorId) {
@@ -116,27 +149,28 @@ const reducer = (state: AppState, action: Action): AppState => {
               return v;
           })
       };
+      break;
     case 'RESET_PASSWORD':
-      // Admin resets password to '123456'
-      // We need to update the actual user object in the array
       const tempPass = '123456';
       if (action.payload.type === 'user') {
-          return {
+          newState = {
               ...state,
               users: state.users.map(u => u.id === action.payload.id ? { ...u, password: tempPass } as any : u)
           };
       } else {
-           // Vendors (simulated)
-           return state;
+           newState = state;
       }
+      break;
     case 'CHANGE_PASSWORD':
-      return {
+      newState = {
           ...state,
           users: state.users.map(u => u.email === action.payload.email ? { ...u, password: action.payload.newPass } as any : u)
       };
+      break;
     default:
       return state;
   }
+  return newState;
 };
 
 const AppContext = createContext<{ state: AppState; dispatch: React.Dispatch<Action> } | undefined>(undefined);
@@ -151,7 +185,7 @@ export const useAppContext = () => {
 interface GoogleLoginButtonProps {
     onClick?: () => void;
     text?: string;
-    onSuccess?: (googleData: any) => void; // New prop for registration flow
+    onSuccess?: (googleData: any) => void;
 }
 
 export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({ onClick, text = "Continuar com Google", onSuccess }) => {
@@ -161,16 +195,9 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({ onClick, t
   const handleGoogleLogin = () => {
     if (onClick) onClick();
 
-    // Simulate API call delay
     setTimeout(() => {
         const mockCPF = "000.000.000-00"; 
         
-        // Normal login page - ask user (only if not registering)
-        if (!onSuccess) {
-            const isSimulatedUser = confirm("DEMO: Simular login de usuário comum?\n\nOK = Usuário\nCancel = Cancelar");
-            if (!isSimulatedUser) return;
-        }
-
         let mockEmail = "usuario@gmail.com";
         let mockName = "Usuário Google";
         const mockPhoto = "https://lh3.googleusercontent.com/a/default-user";
@@ -180,7 +207,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({ onClick, t
              mockEmail = `novo.usuario${randomId}@gmail.com`;
         }
         
-        // If we are in registration mode (onSuccess provided), pass data back and DO NOT login yet
         if (onSuccess) {
             onSuccess({
                 name: mockName,
@@ -190,9 +216,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({ onClick, t
             return; 
         }
 
-        // --- Standard Login Flow ---
-        
-        // Check Ban (CPF or Email)
         if (state.bannedDocuments.includes(mockCPF) || state.bannedDocuments.includes(mockEmail)) {
             alert("Acesso negado: Esta conta foi suspensa pelo administrador.");
             return;
@@ -254,30 +277,8 @@ const Footer = () => {
 const BottomNav = () => {
   const location = useLocation();
   const { state } = useAppContext();
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
-
-  useEffect(() => {
-    // Listen for PWA install prompt
-    const handler = (e: any) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  const handleInstall = () => {
-    if (installPrompt) {
-      installPrompt.prompt();
-      installPrompt.userChoice.then((result: any) => {
-        if (result.outcome === 'accepted') {
-          setInstallPrompt(null);
-        }
-      });
-    }
-  };
   
-  // Hide nav on specific pages, including the new admin login
+  // Hide nav on specific pages
   if (['/register', '/login', '/admin', '/reset-password', '/admin-login'].includes(location.pathname)) return null;
 
   const navClass = (path: string) => 
@@ -286,7 +287,7 @@ const BottomNav = () => {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-200 py-2 pb-safe px-6 flex justify-between items-center z-50 max-w-md mx-auto">
       <Link to="/" className={navClass('/')}>
-        <Home size={24} className="mb-1" />
+        <HomeIcon size={24} className="mb-1" />
         Início
       </Link>
       
@@ -313,7 +314,6 @@ const BottomNav = () => {
         </Link>
       )}
 
-      {/* Settings / Adjustments (Includes Admin Access) */}
       <Link to="/settings" className={navClass('/settings')}>
           <Settings size={24} className="mb-1" />
           Ajustes
@@ -338,7 +338,6 @@ const SettingsPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-sky-100 via-white to-sky-50 pb-24">
-             {/* Header */}
              <div className="bg-white p-6 pb-8 shadow-sm rounded-b-[2rem] mb-6">
                  <h1 className="text-2xl font-bold text-sky-900 mb-6">Ajustes</h1>
                  
@@ -370,8 +369,6 @@ const SettingsPage: React.FC = () => {
              </div>
 
              <div className="px-4 space-y-4">
-                
-                {/* ADMIN ACCESS CARD */}
                 {isAdminOrMaster && (
                     <div 
                         onClick={() => navigate('/admin')}
@@ -390,7 +387,6 @@ const SettingsPage: React.FC = () => {
                     </div>
                 )}
 
-                {/* General Settings Placeholders */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="p-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50">
                         <div className="flex items-center gap-3">
@@ -423,7 +419,7 @@ const SettingsPage: React.FC = () => {
                 )}
                 
                 <div className="text-center pt-8 pb-4">
-                    <p className="text-xs text-gray-400">Versão do App: 1.2.0 (PWA)</p>
+                    <p className="text-xs text-gray-400">Versão do App: 1.5.0 (PWA)</p>
                 </div>
              </div>
         </div>
@@ -456,7 +452,7 @@ const ResetPasswordPage: React.FC = () => {
         setTimeout(() => {
             dispatch({ type: 'CHANGE_PASSWORD', payload: { email: emailFromUrl, newPass } });
             alert("Senha alterada com sucesso! Faça login com a nova senha.");
-            navigate('/admin-login'); // Redirect to admin login if it was an admin reset
+            navigate('/admin-login'); 
         }, 1500);
     };
 
@@ -484,21 +480,8 @@ const ResetPasswordPage: React.FC = () => {
                 </div>
                 
                 <form onSubmit={handleReset} className="p-6 space-y-4">
-                    <Input 
-                        label="Nova Senha" 
-                        type="password" 
-                        value={newPass} 
-                        onChange={e => setNewPass(e.target.value)} 
-                        required 
-                    />
-                    <Input 
-                        label="Confirmar Nova Senha" 
-                        type="password" 
-                        value={confirmPass} 
-                        onChange={e => setConfirmPass(e.target.value)} 
-                        required 
-                    />
-                    
+                    <Input label="Nova Senha" type="password" value={newPass} onChange={e => setNewPass(e.target.value)} required />
+                    <Input label="Confirmar Nova Senha" type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} required />
                     <Button fullWidth type="submit" disabled={isLoading} className="mt-4">
                         {isLoading ? 'Atualizando...' : 'Redefinir Senha'}
                     </Button>
@@ -515,7 +498,6 @@ const AdminLogin: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     
-    // Forgot Password State
     const [isForgotModalOpen, setForgotModalOpen] = useState(false);
     const [forgotEmail, setForgotEmail] = useState('');
     const [isEmailSent, setIsEmailSent] = useState(false);
@@ -523,7 +505,7 @@ const AdminLogin: React.FC = () => {
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // 1. MASTER CREDENTIALS CHECK (Hardcoded as requested)
+        // 1. MASTER CREDENTIALS CHECK
         if (email === 'crinf.informatica@gmail.com' && password === 'Crinf!2025#') {
              const masterUser: UserType = {
                 id: 'master_crinf',
@@ -539,7 +521,7 @@ const AdminLogin: React.FC = () => {
             return;
         }
 
-        // 2. OTHER ADMINS CHECK (From State)
+        // 2. OTHER ADMINS CHECK
         const foundUser = state.users.find(u => u.email === email && u.type === UserEnum.ADMIN);
         
         if (foundUser) {
@@ -564,7 +546,6 @@ const AdminLogin: React.FC = () => {
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-900 max-w-md mx-auto relative overflow-hidden">
-             
              <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
                  <div className="absolute top-[-20%] left-[-20%] w-[140%] h-[140%] bg-[radial-gradient(circle,_var(--tw-gradient-stops))] from-sky-500 to-transparent"></div>
              </div>
@@ -616,10 +597,7 @@ const AdminLogin: React.FC = () => {
                              </button>
                         </div>
 
-                        <button 
-                            type="submit"
-                            className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-sky-900 mt-2"
-                        >
+                        <button type="submit" className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-sky-900 mt-2">
                             Acessar Painel
                         </button>
                     </form>
@@ -633,13 +611,8 @@ const AdminLogin: React.FC = () => {
                         </button>
                     </div>
                 </div>
-
-                <div className="mt-8 text-center text-slate-600 text-[10px] font-mono">
-                    SISTEMA DE GESTÃO CRINF v2.1
-                </div>
              </div>
 
-             {/* Admin Forgot Password Modal */}
              <Modal isOpen={isForgotModalOpen} onClose={() => setForgotModalOpen(false)} title="Recuperar Acesso">
                 {!isEmailSent ? (
                     <div className="space-y-4">
@@ -666,8 +639,6 @@ const AdminLogin: React.FC = () => {
                         <p className="text-sm text-gray-500">
                             Verifique o e-mail <strong>{forgotEmail}</strong> para continuar o processo de alteração de senha.
                         </p>
-                        
-                        {/* SIMULATION FOR DEMO PURPOSES */}
                         <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-xl">
                             <p className="text-xs text-gray-400 uppercase font-bold mb-2 tracking-wider">Simulação (Demo)</p>
                             <button 
@@ -694,12 +665,9 @@ const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     
-    // Forgot Password State
     const [isForgotModalOpen, setForgotModalOpen] = useState(false);
     const [forgotEmail, setForgotEmail] = useState('');
     const [isEmailSent, setIsEmailSent] = useState(false);
-
-    // Security Mechanism States (Rate Limiting)
     const [failedAttempts, setFailedAttempts] = useState(0);
     const [lockoutTime, setLockoutTime] = useState<number | null>(null);
 
@@ -708,10 +676,10 @@ const Login: React.FC = () => {
             if (Date.now() < lockoutTime) {
                 const remaining = Math.ceil((lockoutTime - Date.now()) / 60000);
                 alert(`Muitas tentativas falhas. Por segurança, aguarde ${remaining} minutos para tentar novamente.`);
-                return true; // Locked out
+                return true; 
             } else {
-                setLockoutTime(null); // Lockout expired
-                setFailedAttempts(0); // Reset attempts
+                setLockoutTime(null);
+                setFailedAttempts(0);
                 return false;
             }
         }
@@ -719,46 +687,38 @@ const Login: React.FC = () => {
     };
 
     const handleLogin = () => {
-        // 0. Check Security Lockout
         if (checkLockout()) return;
 
-        // 1. Master Check - PREVENT MANUAL LOGIN
         if (email.toLowerCase() === 'crinf.informatica@gmail.com') {
             alert("Esta conta possui privilégios elevados. Por favor, utilize a área de 'Acesso Administrativo'.");
             navigate('/admin-login');
             return;
         }
 
-        // 2. Find User in State (Users or Vendors)
         const foundUser = state.users.find(u => u.email === email) as any;
         
         if (foundUser) {
-            // Check Ban (CPF/Document OR Email)
             if (state.bannedDocuments.includes(foundUser.cpf) || state.bannedDocuments.includes(foundUser.email)) {
                 alert("Acesso negado: Esta conta foi banida permanentemente pelo administrador.");
                 return;
             }
 
-            // Check if Password Matches
             const storedPass = foundUser.password || '123'; 
 
             if (password === storedPass) {
-                // FORCE PASSWORD RESET if password is '123456' (Admin Reset Default)
                 if (password === '123456') {
                     alert("Sua senha foi redefinida pelo administrador. Por segurança, crie uma nova senha agora.");
                     navigate(`/reset-password?email=${encodeURIComponent(foundUser.email)}`);
                     return;
                 }
-
                 dispatch({ type: 'LOGIN', payload: foundUser });
                 navigate('/');
             } else {
                 handleFailedAttempt();
             }
         } else {
-            // Fallback for demo user or invalid user
              if (email === 'maria@email.com' && password === '123') {
-                  alert("Usuário não encontrado ou senha incorreta."); // Generic error
+                  alert("Usuário não encontrado ou senha incorreta.");
              } else {
                  handleFailedAttempt();
              }
@@ -768,9 +728,7 @@ const Login: React.FC = () => {
     const handleFailedAttempt = () => {
         const newAttempts = failedAttempts + 1;
         setFailedAttempts(newAttempts);
-        
         if (newAttempts >= 3) {
-            // Lockout for 5 minutes after 3 failed attempts
             const lockoutDuration = 5 * 60 * 1000;
             setLockoutTime(Date.now() + lockoutDuration);
             alert("Muitas tentativas incorretas. O login foi bloqueado temporariamente por 5 minutos.");
@@ -784,16 +742,11 @@ const Login: React.FC = () => {
             alert("Digite um e-mail válido.");
             return;
         }
-        // Simulate sending
-        setTimeout(() => {
-            setIsEmailSent(true);
-        }, 1000);
+        setIsEmailSent(true);
     };
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-100 via-white to-sky-50 max-w-md mx-auto relative overflow-hidden">
-            
-            {/* Decorative BG Blob */}
             <div className="absolute top-[-100px] left-[-100px] w-64 h-64 bg-sky-200 rounded-full blur-3xl opacity-50"></div>
             <div className="absolute bottom-[-100px] right-[-100px] w-64 h-64 bg-blue-200 rounded-full blur-3xl opacity-50"></div>
 
@@ -814,31 +767,13 @@ const Login: React.FC = () => {
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs font-bold text-gray-500 ml-1 mb-1 block">E-mail ou Usuário</label>
-                    <input 
-                        className="w-full bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all" 
-                        placeholder="ex: usuario@email.com" 
-                        value={email}
-                        onChange={e => setEmail(e.target.value)}
-                    />
+                    <input className="w-full bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary transition-all" placeholder="ex: usuario@email.com" value={email} onChange={e => setEmail(e.target.value)} />
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-500 ml-1 mb-1 block">Senha</label>
-                    <input 
-                        className="w-full bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all" 
-                        placeholder="••••••" 
-                        type="password" 
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                    />
+                    <input className="w-full bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary transition-all" placeholder="••••••" type="password" value={password} onChange={e => setPassword(e.target.value)} />
                     <div className="flex justify-end mt-2">
-                        <button 
-                            onClick={() => {
-                                setForgotModalOpen(true);
-                                setIsEmailSent(false);
-                                setForgotEmail('');
-                            }}
-                            className="text-primary text-xs hover:text-sky-700 font-semibold transition-colors"
-                        >
+                        <button onClick={() => { setForgotModalOpen(true); setIsEmailSent(false); setForgotEmail(''); }} className="text-primary text-xs hover:text-sky-700 font-semibold transition-colors">
                             Esqueci minha senha
                         </button>
                     </div>
@@ -853,7 +788,6 @@ const Login: React.FC = () => {
                     <span className="flex-shrink-0 mx-4 text-gray-400 text-xs font-semibold uppercase">Ou acesse com</span>
                     <div className="flex-grow border-t border-gray-200"></div>
                   </div>
-
                   <GoogleLoginButton text="Entrar com Google" />
                 </div>
             </div>
@@ -864,22 +798,14 @@ const Login: React.FC = () => {
                 </Link>
             </div>
 
-            {/* Forgot Password Modal */}
             <Modal isOpen={isForgotModalOpen} onClose={() => setForgotModalOpen(false)} title="Recuperar Senha">
                 {!isEmailSent ? (
                     <div className="space-y-4">
                         <div className="bg-sky-50 p-4 rounded-lg flex gap-3 items-start">
                             <Mail className="text-primary mt-1 flex-shrink-0" size={20} />
-                            <p className="text-sm text-gray-600">
-                                Digite seu e-mail abaixo. Enviaremos um link seguro para você redefinir sua senha.
-                            </p>
+                            <p className="text-sm text-gray-600">Digite seu e-mail abaixo. Enviaremos um link seguro.</p>
                         </div>
-                        <Input 
-                            label="Seu E-mail Cadastrado" 
-                            placeholder="exemplo@email.com" 
-                            value={forgotEmail}
-                            onChange={e => setForgotEmail(e.target.value)}
-                        />
+                        <Input label="Seu E-mail Cadastrado" placeholder="exemplo@email.com" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} />
                         <Button fullWidth onClick={handleSendForgotEmail}>Enviar Link de Recuperação</Button>
                     </div>
                 ) : (
@@ -888,21 +814,10 @@ const Login: React.FC = () => {
                             <CheckCircle size={32} />
                         </div>
                         <h3 className="text-lg font-bold text-gray-800">E-mail Enviado!</h3>
-                        <p className="text-sm text-gray-500">
-                            Verifique sua caixa de entrada (e spam) para encontrar as instruções.
-                        </p>
-                        
-                        {/* SIMULATION ONLY: Fake Email Link */}
+                        <p className="text-sm text-gray-500">Verifique sua caixa de entrada.</p>
                         <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-xl">
                             <p className="text-xs text-gray-400 uppercase font-bold mb-2 tracking-wider">Simulação de E-mail</p>
-                            <p className="text-sm text-gray-800 mb-3">Olá, clique abaixo para trocar sua senha:</p>
-                            <button 
-                                onClick={() => {
-                                    setForgotModalOpen(false);
-                                    navigate(`/reset-password?email=${encodeURIComponent(forgotEmail)}`);
-                                }}
-                                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 flex items-center justify-center w-full gap-2"
-                            >
+                            <button onClick={() => { setForgotModalOpen(false); navigate(`/reset-password?email=${encodeURIComponent(forgotEmail)}`); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 flex items-center justify-center w-full gap-2">
                                 Definir Nova Senha <ArrowRight size={16}/>
                             </button>
                         </div>
@@ -930,24 +845,16 @@ const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Initial Data Load
+  // Persistence: Save state to LocalStorage whenever it changes
   useEffect(() => {
-    const loadData = async () => {
-        if(state.vendors.length === 0) {
-            const vendors = await generateMockVendors("Campo Largo, Paraná");
-            if (vendors.length > 0) {
-                // Initialize visibility settings for mock vendors
-                const vendorsWithVisibility = vendors.map(v => ({
-                    ...v,
-                    visibility: { showPhone: true, showAddress: true, showWebsite: true }
-                }));
-                dispatch({ type: 'SET_VENDORS', payload: vendorsWithVisibility });
-            }
-        }
+    const stateToSave = {
+        ...state,
+        currentUser: null, // Don't persist logged user for security (or optional)
+        searchQuery: '',
+        userLocation: null
     };
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    localStorage.setItem('cl_perto_db_v1', JSON.stringify(stateToSave));
+  }, [state]);
 
   // Geolocation Init
   useEffect(() => {
@@ -962,20 +869,13 @@ export default function App() {
     initLocation();
   }, []);
 
-  // Recalculate distances when user location or vendors change
+  // Recalculate distances
   useEffect(() => {
     if (state.userLocation && state.vendors.length > 0) {
         let hasChanges = false;
         const updatedVendors = state.vendors.map(vendor => {
             if (vendor.latitude && vendor.longitude) {
-                const dist = calculateDistance(
-                    state.userLocation!.lat, 
-                    state.userLocation!.lng, 
-                    vendor.latitude, 
-                    vendor.longitude
-                );
-                
-                // Only update if distance significantly different to avoid loop
+                const dist = calculateDistance(state.userLocation!.lat, state.userLocation!.lng, vendor.latitude, vendor.longitude);
                 if (!vendor.distance || Math.abs(vendor.distance - dist) > 0.01) {
                     hasChanges = true;
                     return { ...vendor, distance: dist };
@@ -983,10 +883,7 @@ export default function App() {
             }
             return vendor;
         });
-
-        // Sort by distance (nearest first)
         updatedVendors.sort((a, b) => (a.distance || 999) - (b.distance || 999));
-
         if (hasChanges) {
              dispatch({ type: 'SET_VENDORS', payload: updatedVendors });
         }
@@ -997,17 +894,19 @@ export default function App() {
     <AppContext.Provider value={{ state, dispatch }}>
       <HashRouter>
         <Layout>
-            <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/vendor/:id" element={<VendorDetails />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/admin-login" element={<AdminLogin />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+            <Suspense fallback={<PageLoader />}>
+                <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/vendor/:id" element={<VendorDetails />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/admin-login" element={<AdminLogin />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </Suspense>
         </Layout>
       </HashRouter>
     </AppContext.Provider>
