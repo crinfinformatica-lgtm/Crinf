@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, LogOut } from 'lucide-react';
+import { Shield, User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, LogOut, KeyRound } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Button, Input, Modal, TwoFactorModal, AdminLogo } from '../components/UI';
 import { UserType, User as IUser, Vendor } from '../types';
@@ -88,6 +88,13 @@ export const AdminDashboard: React.FC = () => {
 
   const handleUnban = (doc: string) => {
       dispatch({ type: 'UNBAN_DOCUMENT', payload: doc });
+  };
+  
+  const handleResetPassword = (userId: string, userName: string) => {
+      if (confirm(`Zerar a senha do usuário ${userName} para '123456'?`)) {
+          dispatch({ type: 'MASTER_RESET_PASSWORD', payload: userId });
+          alert(`Senha de ${userName} foi redefinida para: 123456`);
+      }
   };
 
   const openEditModal = (item: any, type: 'user' | 'vendor') => {
@@ -253,6 +260,15 @@ export const AdminDashboard: React.FC = () => {
                             {/* Actions - Protect Master User */}
                             {user.email !== 'crinf.informatica@gmail.com' && (
                                 <div className="flex gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {isMaster && (
+                                        <button
+                                            onClick={() => handleResetPassword(user.id, user.name)}
+                                            className="p-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100"
+                                            title="Zerar Senha para '123456'"
+                                        >
+                                            <KeyRound size={16} />
+                                        </button>
+                                    )}
                                     <button 
                                         onClick={() => openEditModal(user, 'user')}
                                         className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"
@@ -305,6 +321,15 @@ export const AdminDashboard: React.FC = () => {
                             </div>
                             
                             <div className="flex gap-2 justify-end border-t border-gray-50 pt-3">
+                                {isMaster && (
+                                    <button 
+                                        onClick={() => handleResetPassword(vendor.id, vendor.name)}
+                                        className="py-1.5 px-3 bg-yellow-50 text-yellow-600 rounded-md text-xs font-bold hover:bg-yellow-100"
+                                        title="Zerar Senha"
+                                    >
+                                        <KeyRound size={12} />
+                                    </button>
+                                )}
                                 <button 
                                     onClick={() => openEditModal(vendor, 'vendor')}
                                     className="flex-1 py-1.5 bg-blue-50 text-blue-700 rounded-md text-xs font-bold hover:bg-blue-100 flex items-center justify-center gap-1"

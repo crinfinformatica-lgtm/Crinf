@@ -62,8 +62,8 @@ type Action =
   | { type: 'ADD_REVIEW'; payload: { vendorId: string; review: any } }
   | { type: 'REPLY_REVIEW'; payload: { vendorId: string; reviewId: string; replyText: string } }
   | { type: 'SET_LOCATION'; payload: LatLng }
-  | { type: 'RESET_PASSWORD'; payload: { id: string; type: 'user' | 'vendor' } }
-  | { type: 'CHANGE_PASSWORD'; payload: { email: string; newPass: string } };
+  | { type: 'MASTER_RESET_PASSWORD'; payload: string } // Payload is User ID
+  | { type: 'CHANGE_OWN_PASSWORD'; payload: { id: string; newPass: string } };
 
 const reducer = (state: AppState, action: Action): AppState => {
   let newState = state;
@@ -150,21 +150,18 @@ const reducer = (state: AppState, action: Action): AppState => {
           })
       };
       break;
-    case 'RESET_PASSWORD':
-      const tempPass = '123456';
-      if (action.payload.type === 'user') {
-          newState = {
-              ...state,
-              users: state.users.map(u => u.id === action.payload.id ? { ...u, password: tempPass } as any : u)
-          };
-      } else {
-           newState = state;
-      }
-      break;
-    case 'CHANGE_PASSWORD':
+    case 'MASTER_RESET_PASSWORD':
+      const defaultPass = '123456';
       newState = {
           ...state,
-          users: state.users.map(u => u.email === action.payload.email ? { ...u, password: action.payload.newPass } as any : u)
+          users: state.users.map(u => u.id === action.payload ? { ...u, password: defaultPass } as any : u)
+      };
+      break;
+    case 'CHANGE_OWN_PASSWORD':
+      newState = {
+          ...state,
+          users: state.users.map(u => u.id === action.payload.id ? { ...u, password: action.payload.newPass } as any : u),
+          currentUser: state.currentUser && state.currentUser.id === action.payload.id ? { ...state.currentUser, password: action.payload.newPass } : state.currentUser
       };
       break;
     default:
@@ -207,7 +204,7 @@ const BottomNav = () => {
   const { state } = useAppContext();
   
   // Hide nav on specific pages
-  if (['/register', '/login', '/admin', '/reset-password', '/admin-login'].includes(location.pathname)) return null;
+  if (['/register', '/login', '/admin', '/admin-login'].includes(location.pathname)) return null;
 
   const navClass = (path: string) => 
     `flex flex-col items-center p-2 text-xs font-medium transition-colors ${location.pathname === path ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`;
@@ -254,6 +251,11 @@ const BottomNav = () => {
 const SettingsPage: React.FC = () => {
     const { state, dispatch } = useAppContext();
     const navigate = useNavigate();
+    
+    // Change Password State
+    const [isChangePassOpen, setChangePassOpen] = useState(false);
+    const [newPass, setNewPass] = useState('');
+    const [confirmPass, setConfirmPass] = useState('');
 
     const handleLogout = () => {
         if(confirm("Tem certeza que deseja sair?")) {
@@ -279,6 +281,28 @@ const SettingsPage: React.FC = () => {
             navigator.clipboard.writeText(shareData.url);
             alert('Link do aplicativo copiado para a área de transferência!');
         }
+    };
+    
+    const handleChangePassword = () => {
+        if (!state.currentUser) return;
+        if (newPass.length < 4) {
+            alert("A senha deve ter pelo menos 4 caracteres.");
+            return;
+        }
+        if (newPass !== confirmPass) {
+            alert("As senhas não conferem.");
+            return;
+        }
+        
+        dispatch({ 
+            type: 'CHANGE_OWN_PASSWORD', 
+            payload: { id: state.currentUser.id, newPass } 
+        });
+        
+        alert("Senha alterada com sucesso!");
+        setChangePassOpen(false);
+        setNewPass('');
+        setConfirmPass('');
     };
 
     const isAdminOrMaster = state.currentUser?.type === UserEnum.ADMIN || state.currentUser?.type === UserEnum.MASTER;
@@ -333,6 +357,22 @@ const SettingsPage: React.FC = () => {
                         <ChevronRight size={20} className="text-white/70" />
                     </div>
                 )}
+                
+                {/* User Settings - Change Password */}
+                {state.currentUser && (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div 
+                            onClick={() => setChangePassOpen(true)}
+                            className="p-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+                        >
+                            <div className="flex items-center gap-3">
+                                <Lock size={20} className="text-gray-400" />
+                                <span className="text-gray-700 font-medium">Alterar Senha</span>
+                            </div>
+                            <ChevronRight size={16} className="text-gray-300" />
+                        </div>
+                    </div>
+                )}
 
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="p-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50">
@@ -378,74 +418,19 @@ const SettingsPage: React.FC = () => {
                 )}
                 
                 <div className="text-center pt-8 pb-4">
-                    <p className="text-xs text-gray-400">Versão do App: 1.6.0 (PWA)</p>
+                    <p className="text-xs text-gray-400">Versão do App: 1.7.0 (PWA)</p>
                 </div>
              </div>
-        </div>
-    );
-};
-
-// --- Reset Password Page ---
-const ResetPasswordPage: React.FC = () => {
-    const [searchParams] = useSearchParams();
-    const navigate = useNavigate();
-    const { dispatch } = useAppContext();
-    const emailFromUrl = searchParams.get('email') || '';
-    
-    const [newPass, setNewPass] = useState('');
-    const [confirmPass, setConfirmPass] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-
-    const handleReset = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (newPass !== confirmPass) {
-            alert("As senhas não coincidem.");
-            return;
-        }
-        if (newPass.length < 4) {
-            alert("A senha deve ter pelo menos 4 caracteres.");
-            return;
-        }
-
-        setIsLoading(true);
-        setTimeout(() => {
-            dispatch({ type: 'CHANGE_PASSWORD', payload: { email: emailFromUrl, newPass } });
-            alert("Senha alterada com sucesso! Faça login com a nova senha.");
-            navigate('/login'); 
-        }, 1500);
-    };
-
-    if (!emailFromUrl) {
-        return (
-            <div className="min-h-screen flex items-center justify-center p-6 bg-sky-50">
-                <div className="bg-white p-6 rounded-2xl shadow text-center">
-                    <AlertTriangle className="mx-auto text-red-500 mb-2" size={32} />
-                    <p>Link de redefinição inválido.</p>
-                    <button onClick={() => navigate('/')} className="mt-4 text-primary font-bold">Voltar para Início</button>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-100 via-white to-sky-50 max-w-md mx-auto">
-             <div className="w-full bg-white rounded-3xl shadow-2xl overflow-hidden animate-slide-up">
-                <div className="bg-sky-50 p-6 text-center border-b border-sky-100">
-                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm text-primary">
-                        <Lock size={32} />
-                    </div>
-                    <h2 className="text-xl font-bold text-gray-800">Criar Nova Senha</h2>
-                    <p className="text-sm text-gray-500 mt-1">Defina uma nova senha para<br/><strong>{emailFromUrl}</strong></p>
-                </div>
-                
-                <form onSubmit={handleReset} className="p-6 space-y-4">
-                    <Input label="Nova Senha" type="password" value={newPass} onChange={e => setNewPass(e.target.value)} required />
-                    <Input label="Confirmar Nova Senha" type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} required />
-                    <Button fullWidth type="submit" disabled={isLoading} className="mt-4">
-                        {isLoading ? 'Atualizando...' : 'Redefinir Senha'}
-                    </Button>
-                </form>
-             </div>
+             
+             {/* Change Password Modal */}
+             <Modal isOpen={isChangePassOpen} onClose={() => setChangePassOpen(false)} title="Alterar Senha">
+                 <div className="space-y-4">
+                     <p className="text-sm text-gray-600 mb-2">Defina sua nova senha de acesso.</p>
+                     <Input label="Nova Senha" type="password" value={newPass} onChange={e => setNewPass(e.target.value)} />
+                     <Input label="Confirmar Senha" type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} />
+                     <Button fullWidth onClick={handleChangePassword}>Salvar Nova Senha</Button>
+                 </div>
+             </Modal>
         </div>
     );
 };
@@ -457,12 +442,6 @@ const AdminLogin: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     
-    const [isForgotModalOpen, setForgotModalOpen] = useState(false);
-    const [forgotEmail, setForgotEmail] = useState('');
-    const [isEmailSent, setIsEmailSent] = useState(false);
-    
-    const resetLink = window.location.href.split('#')[0] + '#/reset-password?email=' + encodeURIComponent(forgotEmail);
-
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -495,32 +474,6 @@ const AdminLogin: React.FC = () => {
         } else {
             alert("Credenciais inválidas ou usuário sem permissão.");
         }
-    };
-
-    const handleSendForgotEmail = () => {
-        if (!forgotEmail.includes('@')) {
-            alert("Digite um e-mail válido.");
-            return;
-        }
-
-        // --- EMAILJS INTEGRATION ---
-        const emailjs = (window as any).emailjs;
-        if (emailjs) {
-             const templateParams = {
-                to_email: forgotEmail,
-                reset_link: window.location.href.split('#')[0] + '#/reset-password?email=' + encodeURIComponent(forgotEmail)
-            };
-            
-            // Using provided Service ID: service_dtvvjp8
-            // You still need Template ID and Public Key for it to work fully
-            emailjs.send('service_dtvvjp8', 'template_id_placeholder', templateParams, 'public_key_placeholder')
-                .then(() => {
-                    console.log("Email sent via EmailJS");
-                })
-                .catch((err: any) => console.error("EmailJS Error:", err));
-        }
-
-        setIsEmailSent(true);
     };
 
     return (
@@ -562,20 +515,6 @@ const AdminLogin: React.FC = () => {
                             />
                         </div>
                         
-                        <div className="flex justify-end">
-                             <button 
-                                type="button"
-                                onClick={() => {
-                                    setForgotModalOpen(true);
-                                    setIsEmailSent(false);
-                                    setForgotEmail('');
-                                }}
-                                className="text-sky-400 hover:text-sky-300 text-xs font-medium flex items-center gap-1"
-                             >
-                                <KeyRound size={12} /> Esqueci a senha
-                             </button>
-                        </div>
-
                         <button type="submit" className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-sky-900 mt-2">
                             Acessar Painel
                         </button>
@@ -591,53 +530,6 @@ const AdminLogin: React.FC = () => {
                     </div>
                 </div>
              </div>
-
-             <Modal isOpen={isForgotModalOpen} onClose={() => setForgotModalOpen(false)} title="Recuperar Acesso">
-                {!isEmailSent ? (
-                    <div className="space-y-4">
-                        <div className="bg-yellow-50 p-4 rounded-lg flex gap-3 items-start border border-yellow-200">
-                            <Shield className="text-yellow-600 mt-1 flex-shrink-0" size={20} />
-                            <p className="text-sm text-yellow-800">
-                                Por segurança, contas administrativas só podem redefinir a senha através de um link enviado ao e-mail cadastrado.
-                            </p>
-                        </div>
-                        <Input 
-                            label="E-mail Administrativo" 
-                            placeholder="admin@empresa.com" 
-                            value={forgotEmail}
-                            onChange={e => setForgotEmail(e.target.value)}
-                        />
-                        <Button fullWidth onClick={handleSendForgotEmail}>Enviar Link de Redefinição</Button>
-                    </div>
-                ) : (
-                    <div className="text-center space-y-4 py-4">
-                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 mb-2">
-                            <CheckCircle size={32} />
-                        </div>
-                        <h3 className="text-lg font-bold text-gray-800">Link Gerado!</h3>
-                        <p className="text-sm text-gray-600">
-                            Como este é um ambiente <strong>sem servidor de e-mail</strong>, clique no link abaixo para prosseguir:
-                        </p>
-                        
-                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 break-all font-mono text-xs text-blue-600 mb-2">
-                            {resetLink}
-                        </div>
-
-                        <Button fullWidth onClick={() => {
-                            window.location.href = resetLink;
-                            setForgotModalOpen(false);
-                        }}>
-                            Abrir Link de Redefinição
-                        </Button>
-
-                        <div className="mt-6">
-                            <Button fullWidth variant="outline" onClick={() => setForgotModalOpen(false)}>
-                                Fechar
-                            </Button>
-                        </div>
-                    </div>
-                )}
-            </Modal>
         </div>
     );
 };
@@ -649,9 +541,6 @@ const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     
-    const [isForgotModalOpen, setForgotModalOpen] = useState(false);
-    const [forgotEmail, setForgotEmail] = useState('');
-    const [isEmailSent, setIsEmailSent] = useState(false);
     const [failedAttempts, setFailedAttempts] = useState(0);
     const [lockoutTime, setLockoutTime] = useState<number | null>(null);
 
@@ -691,9 +580,7 @@ const Login: React.FC = () => {
 
             if (password === storedPass) {
                 if (password === '123456') {
-                    alert("Sua senha foi redefinida pelo administrador. Por segurança, crie uma nova senha agora.");
-                    navigate(`/reset-password?email=${encodeURIComponent(foundUser.email)}`);
-                    return;
+                    alert("Sua senha foi redefinida pelo administrador para '123456'. Recomendamos alterá-la em Ajustes.");
                 }
                 dispatch({ type: 'LOGIN', payload: foundUser });
                 navigate('/');
@@ -716,17 +603,6 @@ const Login: React.FC = () => {
             alert(`Senha incorreta ou Usuário não encontrado. Tentativa ${newAttempts} de 3.`);
         }
     };
-
-    const handleSendForgotEmail = () => {
-        if (!forgotEmail.includes('@')) {
-            alert("Digite um e-mail válido.");
-            return;
-        }
-        setIsEmailSent(true);
-    };
-    
-    // Standard User Reset Link logic
-    const userResetLink = window.location.href.split('#')[0] + '#/reset-password?email=' + encodeURIComponent(forgotEmail);
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-100 via-white to-sky-50 max-w-md mx-auto relative overflow-hidden">
@@ -755,11 +631,6 @@ const Login: React.FC = () => {
                   <div>
                     <label className="text-xs font-bold text-gray-500 ml-1 mb-1 block">Senha</label>
                     <input className="w-full bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary transition-all" placeholder="••••••" type="password" value={password} onChange={e => setPassword(e.target.value)} />
-                    <div className="flex justify-end mt-2">
-                        <button onClick={() => { setForgotModalOpen(true); setIsEmailSent(false); setForgotEmail(''); }} className="text-primary text-xs hover:text-sky-700 font-semibold transition-colors">
-                            Esqueci minha senha
-                        </button>
-                    </div>
                   </div>
                   
                   <button onClick={handleLogin} className="w-full bg-primary text-white font-bold py-3.5 rounded-xl hover:bg-sky-600 transition shadow-lg shadow-sky-200 mt-2">
@@ -780,40 +651,6 @@ const Login: React.FC = () => {
                      <Shield size={12} /> Acesso Administrativo
                 </Link>
             </div>
-
-            <Modal isOpen={isForgotModalOpen} onClose={() => setForgotModalOpen(false)} title="Recuperar Senha">
-                {!isEmailSent ? (
-                    <div className="space-y-4">
-                        <div className="bg-sky-50 p-4 rounded-lg flex gap-3 items-start">
-                            <Mail className="text-primary mt-1 flex-shrink-0" size={20} />
-                            <p className="text-sm text-gray-600">Digite seu e-mail abaixo. Enviaremos um link seguro.</p>
-                        </div>
-                        <Input label="Seu E-mail Cadastrado" placeholder="exemplo@email.com" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} />
-                        <Button fullWidth onClick={handleSendForgotEmail}>Enviar Link de Recuperação</Button>
-                    </div>
-                ) : (
-                    <div className="text-center space-y-4 py-4">
-                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 mb-2">
-                            <CheckCircle size={32} />
-                        </div>
-                        <h3 className="text-lg font-bold text-gray-800">Link Gerado!</h3>
-                        <p className="text-sm text-gray-500">
-                           Para fins de teste (sem servidor de e-mail), use o link abaixo:
-                        </p>
-                        
-                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 break-all font-mono text-xs text-blue-600 mb-2">
-                            {userResetLink}
-                        </div>
-
-                        <Button fullWidth onClick={() => {
-                            window.location.href = userResetLink;
-                            setForgotModalOpen(false);
-                        }}>
-                             Definir Nova Senha
-                        </Button>
-                    </div>
-                )}
-            </Modal>
         </div>
     );
 };
@@ -892,7 +729,6 @@ export default function App() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/admin-login" element={<AdminLogin />} />
                     <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/reset-password" element={<ResetPasswordPage />} />
                     <Route path="/admin" element={<AdminDashboard />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
