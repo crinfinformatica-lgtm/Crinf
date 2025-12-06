@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, MapPin, Filter, Store, UserPlus, Navigation, Share2 } from 'lucide-react';
+import { Search, MapPin, Filter, Store, UserPlus, Navigation, Share2, Check } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Vendor, CATEGORIES } from '../types';
 import { VendorCard, Button } from '../components/UI';
@@ -66,6 +66,9 @@ export const Home: React.FC = () => {
   const [localSearch, setLocalSearch] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [viewMode, setViewMode] = useState<'landing' | 'search'>('landing');
+  
+  // Distance Filter State: null means "All/No limit"
+  const [maxDistance, setMaxDistance] = useState<number | null>(null);
 
   // Logic to determine if we should stay in search mode if there's an active query
   useEffect(() => {
@@ -120,13 +123,19 @@ export const Home: React.FC = () => {
         v.description.toLowerCase().includes(state.searchQuery.toLowerCase())
       : true;
 
-    return matchesCategory && matchesSearch;
+    // Distance Filter Logic
+    const matchesDistance = maxDistance === null 
+        ? true 
+        : (v.distance !== undefined && v.distance <= maxDistance);
+
+    return matchesCategory && matchesSearch && matchesDistance;
   });
 
   const goHome = () => {
       dispatch({ type: 'SET_CATEGORY', payload: null });
       dispatch({ type: 'SET_SEARCH', payload: '' });
       setLocalSearch('');
+      setMaxDistance(null);
       setViewMode('landing');
   }
 
@@ -251,6 +260,31 @@ export const Home: React.FC = () => {
         </div>
       </div>
 
+      {/* Distance Filters */}
+      <div className="px-4 mb-4">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
+              <div className="flex items-center text-xs text-gray-400 font-bold mr-2">
+                  <Filter size={14} className="mr-1" /> Raio:
+              </div>
+              <button 
+                  onClick={() => setMaxDistance(null)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${maxDistance === null ? 'bg-sky-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+              >
+                  Todos
+              </button>
+              {[1, 3, 5, 10, 20].map(dist => (
+                  <button 
+                      key={dist}
+                      onClick={() => setMaxDistance(dist)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1 ${maxDistance === dist ? 'bg-sky-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'}`}
+                  >
+                      {maxDistance === dist && <Check size={12} />}
+                      Até {dist}km
+                  </button>
+              ))}
+          </div>
+      </div>
+
       {/* Results */}
       <div className="px-4">
         <div className="flex justify-between items-center mb-3">
@@ -270,10 +304,14 @@ export const Home: React.FC = () => {
                 <Search className="text-primary" size={32}/>
             </div>
             <p className="text-gray-500 font-medium">Nenhum resultado encontrado.</p>
+            {maxDistance !== null && (
+                <p className="text-xs text-gray-400 mt-2">Tente aumentar o raio de distância.</p>
+            )}
             <Button variant="outline" className="mt-6 border-primary text-primary" onClick={() => {
                 dispatch({ type: 'SET_CATEGORY', payload: null });
                 dispatch({ type: 'SET_SEARCH', payload: '' });
                 setLocalSearch('');
+                setMaxDistance(null);
             }}>Limpar Filtros</Button>
           </div>
         ) : (
