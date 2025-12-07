@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, LogOut, KeyRound } from 'lucide-react';
+import { Shield, User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, LogOut, KeyRound, Lock, ShieldAlert, History } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Button, Input, Modal, TwoFactorModal, AdminLogo } from '../components/UI';
 import { UserType, User as IUser, Vendor } from '../types';
@@ -9,8 +9,11 @@ import { UserType, User as IUser, Vendor } from '../types';
 export const AdminDashboard: React.FC = () => {
   const { state, dispatch } = useAppContext();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'vendors' | 'banned' | 'distribute'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'vendors' | 'banned' | 'distribute' | 'security'>('users');
   
+  // Session Timeout State
+  const [lastActivity, setLastActivity] = useState(Date.now());
+
   // Editing state
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
@@ -29,6 +32,11 @@ export const AdminDashboard: React.FC = () => {
   const [is2FAOpen, set2FAOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [actionTitle, setActionTitle] = useState('');
+
+  // Master Security State
+  const [currentPass, setCurrentPass] = useState('');
+  const [newMasterPass, setNewMasterPass] = useState('');
+  const [confirmMasterPass, setConfirmMasterPass] = useState('');
 
   // Form State
   const [editName, setEditName] = useState('');
@@ -57,6 +65,32 @@ export const AdminDashboard: React.FC = () => {
         navigate('/'); // Regular users go home
     }
   }, [state.currentUser, navigate]);
+
+  // Session Timeout Monitor (10 Minutes)
+  useEffect(() => {
+      const timeout = 10 * 60 * 1000; // 10 minutes
+      
+      const checkActivity = setInterval(() => {
+          if (Date.now() - lastActivity > timeout) {
+              alert("Sessão expirada por inatividade. Por segurança, faça login novamente.");
+              dispatch({ type: 'LOGOUT' });
+              navigate('/admin-login');
+          }
+      }, 30000); // Check every 30s
+
+      const updateActivity = () => setLastActivity(Date.now());
+      
+      window.addEventListener('mousemove', updateActivity);
+      window.addEventListener('keypress', updateActivity);
+      window.addEventListener('click', updateActivity);
+
+      return () => {
+          clearInterval(checkActivity);
+          window.removeEventListener('mousemove', updateActivity);
+          window.removeEventListener('keypress', updateActivity);
+          window.removeEventListener('click', updateActivity);
+      };
+  }, [lastActivity, dispatch, navigate]);
 
   const handleDelete = (id: string, type: 'user' | 'vendor') => {
     // Exclusão direta sem 2FA conforme solicitado
@@ -161,6 +195,39 @@ export const AdminDashboard: React.FC = () => {
       setNewUserEmail('');
   };
 
+  const handleMasterPasswordChange = () => {
+      if (!state.currentUser) return;
+      if (state.currentUser.type !== UserType.MASTER) {
+          alert("Apenas o Master pode alterar esta senha.");
+          return;
+      }
+      if (state.currentUser.password !== currentPass) {
+          alert("A senha atual está incorreta.");
+          return;
+      }
+      if (newMasterPass.length < 6) {
+          alert("A nova senha deve ter no mínimo 6 caracteres.");
+          return;
+      }
+      if (newMasterPass !== confirmMasterPass) {
+          alert("A nova senha e a confirmação não coincidem.");
+          return;
+      }
+
+      dispatch({ 
+          type: 'CHANGE_OWN_PASSWORD', 
+          payload: { id: state.currentUser.id, newPass: newMasterPass } 
+      });
+      dispatch({
+          type: 'ADD_SECURITY_LOG',
+          payload: { action: 'PASSWORD_CHANGE', details: 'O Master alterou sua própria senha.' }
+      });
+      alert("Senha Master atualizada com sucesso.");
+      setCurrentPass('');
+      setNewMasterPass('');
+      setConfirmMasterPass('');
+  };
+
   const handleLogout = () => {
     if(confirm("Deseja desconectar do painel administrativo?")) {
         dispatch({ type: 'LOGOUT' });
@@ -205,6 +272,7 @@ export const AdminDashboard: React.FC = () => {
                 { id: 'users', icon: User, label: 'Usuários' },
                 { id: 'vendors', icon: Store, label: 'Comércios' },
                 { id: 'banned', icon: Ban, label: 'Banidos' },
+                { id: 'security', icon: ShieldAlert, label: 'Segurança' },
                 { id: 'distribute', icon: Share2, label: 'Distribuição' }
             ].map(tab => (
                 <button
@@ -405,6 +473,121 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                 )}
              </div>
+        )}
+
+        {/* SECURITY TAB */}
+        {activeTab === 'security' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+                {/* Change Password Panel */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="bg-purple-100 p-2 rounded-lg">
+                            <Lock size={20} className="text-purple-600" />
+                        </div>
+                        <div>
+                            <h2 className="font-bold text-gray-800">Alterar Senha Master</h2>
+                            <p className="text-xs text-gray-500">Atualize sua credencial de acesso.</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <Input 
+                            label="Senha Atual" 
+                            type="password" 
+                            placeholder="Digite a senha atual" 
+                            value={currentPass} 
+                            onChange={e => setCurrentPass(e.target.value)} 
+                        />
+                        <Input 
+                            label="Nova Senha" 
+                            type="password" 
+                            placeholder="Mínimo 6 caracteres" 
+                            value={newMasterPass} 
+                            onChange={e => setNewMasterPass(e.target.value)} 
+                        />
+                        <Input 
+                            label="Confirmar Nova Senha" 
+                            type="password" 
+                            placeholder="Repita a nova senha" 
+                            value={confirmMasterPass} 
+                            onChange={e => setConfirmMasterPass(e.target.value)} 
+                        />
+                        <Button fullWidth onClick={handleMasterPasswordChange} className="mt-4">
+                            Atualizar Senha
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Security Logs & Session Info */}
+                <div className="space-y-6">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="bg-blue-100 p-2 rounded-lg">
+                                <ShieldAlert size={20} className="text-blue-600" />
+                            </div>
+                            <div>
+                                <h2 className="font-bold text-gray-800">Proteção de Sessão</h2>
+                                <p className="text-xs text-gray-500">Mecanismos ativos de segurança.</p>
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                 <span className="text-sm font-medium text-gray-700">Auto-Logout (Inatividade)</span>
+                                 <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded">ATIVO (10min)</span>
+                             </div>
+                             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                 <span className="text-sm font-medium text-gray-700">Bloqueio Força Bruta</span>
+                                 <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded">ATIVO (5 erros)</span>
+                             </div>
+                             <Button 
+                                variant="outline" 
+                                fullWidth 
+                                className="mt-2 text-red-600 border-red-200 hover:bg-red-50"
+                                onClick={() => {
+                                    dispatch({ type: 'LOGOUT' });
+                                    navigate('/admin-login');
+                                }}
+                             >
+                                 Encerrar Sessão Agora
+                             </Button>
+                        </div>
+                    </div>
+
+                    {/* Access Logs */}
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                         <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <History size={18} className="text-gray-400" />
+                                <h2 className="font-bold text-gray-800 text-sm">Log de Acessos</h2>
+                            </div>
+                            <button 
+                                onClick={() => dispatch({ type: 'CLEAR_SECURITY_LOGS' })}
+                                className="text-[10px] text-red-400 hover:text-red-600 underline"
+                            >
+                                Limpar
+                            </button>
+                        </div>
+                        <div className="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                            {state.securityLogs && state.securityLogs.length > 0 ? (
+                                state.securityLogs.map((log) => (
+                                    <div key={log.id} className="text-xs border-l-2 border-gray-200 pl-2 py-1">
+                                        <div className="flex justify-between">
+                                            <span className={`font-bold ${log.action === 'LOGIN_SUCCESS' ? 'text-green-600' : log.action === 'LOGIN_FAIL' ? 'text-red-600' : 'text-blue-600'}`}>
+                                                {log.action === 'LOGIN_SUCCESS' ? 'Login Sucesso' : log.action === 'LOGIN_FAIL' ? 'Falha Login' : 'Ação Admin'}
+                                            </span>
+                                            <span className="text-gray-400">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                        </div>
+                                        <p className="text-gray-500 truncate">{log.details}</p>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-xs text-gray-400 italic">Nenhum registro recente.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
         )}
 
         {/* DISTRIBUTE TAB */}

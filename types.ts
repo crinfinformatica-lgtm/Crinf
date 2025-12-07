@@ -61,6 +61,14 @@ export interface Location {
   lng: number;
 }
 
+export interface SecurityLog {
+  id: string;
+  timestamp: number;
+  action: 'LOGIN_SUCCESS' | 'LOGIN_FAIL' | 'PASSWORD_CHANGE' | 'BAN_ACTION';
+  details: string;
+  ip?: string; // Simulated in frontend
+}
+
 export interface AppState {
   currentUser: User | Vendor | null;
   users: User[]; // Track all registered users
@@ -69,6 +77,7 @@ export interface AppState {
   searchQuery: string;
   selectedCategory: string | null;
   userLocation: Location | null;
+  securityLogs: SecurityLog[]; // New field for security auditing
 }
 
 export const CATEGORIES = [

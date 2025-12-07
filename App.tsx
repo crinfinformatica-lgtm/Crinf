@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, Suspense, lazy, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera, Upload, X, MapPin } from 'lucide-react';
-import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum, CATEGORIES } from './types';
+import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum, CATEGORIES, SecurityLog } from './types';
 import { getUserLocation, calculateDistance } from './services/geoService';
 import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo } from './components/UI';
 import { INITIAL_DB } from './database';
@@ -26,7 +26,10 @@ const loadStateFromStorage = (): AppState => {
   try {
     const saved = localStorage.getItem('cl_perto_db_v1');
     if (saved) {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      // Ensure securityLogs exists for migration from older versions
+      if (!parsed.securityLogs) parsed.securityLogs = [];
+      return parsed;
     }
   } catch (e) {
     console.error("Failed to load state", e);
@@ -39,7 +42,8 @@ const loadStateFromStorage = (): AppState => {
     bannedDocuments: INITIAL_DB.bannedDocuments || [],
     searchQuery: '',
     selectedCategory: null,
-    userLocation: null
+    userLocation: null,
+    securityLogs: []
   };
 };
 
@@ -63,7 +67,9 @@ type Action =
   | { type: 'REPLY_REVIEW'; payload: { vendorId: string; reviewId: string; replyText: string } }
   | { type: 'SET_LOCATION'; payload: LatLng }
   | { type: 'MASTER_RESET_PASSWORD'; payload: string } // Payload is User ID
-  | { type: 'CHANGE_OWN_PASSWORD'; payload: { id: string; newPass: string } };
+  | { type: 'CHANGE_OWN_PASSWORD'; payload: { id: string; newPass: string } }
+  | { type: 'ADD_SECURITY_LOG'; payload: Omit<SecurityLog, 'id' | 'timestamp'> }
+  | { type: 'CLEAR_SECURITY_LOGS' };
 
 const reducer = (state: AppState, action: Action): AppState => {
   let newState = state;
@@ -188,6 +194,21 @@ const reducer = (state: AppState, action: Action): AppState => {
           users: state.users.map(u => u.id === action.payload.id ? { ...u, password: action.payload.newPass } as any : u),
           currentUser: state.currentUser && state.currentUser.id === action.payload.id ? { ...state.currentUser, password: action.payload.newPass } : state.currentUser
       };
+      break;
+    case 'ADD_SECURITY_LOG':
+      const newLog: SecurityLog = {
+          id: Date.now().toString(),
+          timestamp: Date.now(),
+          action: action.payload.action,
+          details: action.payload.details,
+          ip: '192.168.x.x (Simulado)'
+      };
+      // Keep only last 50 logs
+      const updatedLogs = [newLog, ...(state.securityLogs || [])].slice(0, 50);
+      newState = { ...state, securityLogs: updatedLogs };
+      break;
+    case 'CLEAR_SECURITY_LOGS':
+      newState = { ...state, securityLogs: [] };
       break;
     default:
       return state;
@@ -627,29 +648,52 @@ const AdminLogin: React.FC = () => {
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [lockedUntil, setLockedUntil] = useState<number | null>(null);
     
+    // Check security logs for brute force protection
+    useEffect(() => {
+        const checkSecurity = () => {
+            if (!state.securityLogs) return;
+            const recentFailures = state.securityLogs.filter(log => 
+                log.action === 'LOGIN_FAIL' && 
+                log.timestamp > Date.now() - 15 * 60 * 1000 // Last 15 min
+            );
+            if (recentFailures.length >= 5) {
+                // Determine remaining time
+                const lastFail = recentFailures[0].timestamp;
+                setLockedUntil(lastFail + 15 * 60 * 1000);
+            }
+        };
+        checkSecurity();
+    }, [state.securityLogs]);
+
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // 1. Check DB first for Master User (allows custom password)
-        const dbMaster = state.users.find(u => u.email === 'crinf.informatica@gmail.com');
-        
-        if (dbMaster) {
-            if (dbMaster.password === password) {
-                dispatch({ type: 'LOGIN', payload: dbMaster });
-                navigate('/admin');
+        // BRUTE FORCE CHECK
+        if (lockedUntil) {
+            if (Date.now() < lockedUntil) {
+                const remaining = Math.ceil((lockedUntil - Date.now()) / 60000);
+                alert(`Sistema Bloqueado por Segurança. Tente novamente em ${remaining} minutos.`);
                 return;
             } else {
-                // IMPORTANT: If user exists in DB but password is wrong, FAIL here.
-                // Do NOT fall through to the hardcoded default below, or a user who changed their password
-                // could still be hacked by someone using the default password.
-                alert("Senha incorreta.");
-                return;
+                setLockedUntil(null); // Reset
             }
-        } 
+        }
+
+        // 1. Check DB first for Master User
+        const dbMaster = state.users.find(u => u.email === 'crinf.informatica@gmail.com');
         
-        // 2. Fallback ONLY if Master User is NOT in DB yet (First run or wiped DB)
-        if (email === 'crinf.informatica@gmail.com' && password === 'Crinf!2025#') {
+        let success = false;
+        let loggedUser: UserType | null = null;
+
+        if (dbMaster) {
+            if (dbMaster.password === password) {
+                success = true;
+                loggedUser = dbMaster;
+            }
+        } else if (email === 'crinf.informatica@gmail.com' && password === 'Crinf!2025#') {
+             // Fallback
              const masterUser: UserType = {
                 id: 'master_crinf',
                 name: 'Administrador Crinf',
@@ -660,25 +704,31 @@ const AdminLogin: React.FC = () => {
                 photoUrl: undefined,
                 password: 'Crinf!2025#'
             };
-            // If logging in via hardcode, sync to DB so future edits work
             dispatch({ type: 'ADD_USER', payload: masterUser });
-            dispatch({ type: 'LOGIN', payload: masterUser });
-            navigate('/admin');
-            return;
+            success = true;
+            loggedUser = masterUser;
+        } else {
+            // Check other admins
+            const foundUser = state.users.find(u => u.email === email && u.type === UserEnum.ADMIN);
+            if (foundUser && foundUser.password === password) {
+                success = true;
+                loggedUser = foundUser;
+            }
         }
 
-        // 3. OTHER ADMINS CHECK
-        const foundUser = state.users.find(u => u.email === email && u.type === UserEnum.ADMIN);
-        
-        if (foundUser) {
-            if (foundUser.password === password) {
-                dispatch({ type: 'LOGIN', payload: foundUser });
-                navigate('/admin');
-            } else {
-                alert("Senha incorreta.");
-            }
+        if (success && loggedUser) {
+            dispatch({ type: 'LOGIN', payload: loggedUser });
+            dispatch({ 
+                type: 'ADD_SECURITY_LOG', 
+                payload: { action: 'LOGIN_SUCCESS', details: `Acesso realizado por ${loggedUser.email}` } 
+            });
+            navigate('/admin');
         } else {
-            alert("Credenciais inválidas ou usuário sem permissão.");
+            dispatch({ 
+                type: 'ADD_SECURITY_LOG', 
+                payload: { action: 'LOGIN_FAIL', details: `Falha de login para o e-mail: ${email}` } 
+            });
+            alert("Senha incorreta ou acesso não autorizado.");
         }
     };
 
@@ -720,6 +770,15 @@ const AdminLogin: React.FC = () => {
                     <h1 className="text-2xl font-bold text-white text-center mb-1">Acesso Administrativo</h1>
                     <p className="text-slate-400 text-sm text-center mb-8">Restrito para Master e Administradores</p>
 
+                    {lockedUntil && Date.now() < lockedUntil && (
+                        <div className="bg-red-900/50 border border-red-500 p-3 rounded-lg mb-4 flex items-center gap-2">
+                             <Shield size={20} className="text-red-400" />
+                             <p className="text-xs text-red-200">
+                                 <strong>Proteção Ativa:</strong> Acesso bloqueado temporariamente devido a múltiplas tentativas falhas.
+                             </p>
+                        </div>
+                    )}
+
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-400 ml-1">E-mail Corporativo</label>
@@ -742,7 +801,11 @@ const AdminLogin: React.FC = () => {
                             />
                         </div>
                         
-                        <button type="submit" className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-sky-900 mt-2">
+                        <button 
+                            type="submit" 
+                            disabled={!!(lockedUntil && Date.now() < lockedUntil)}
+                            className={`w-full font-bold py-3.5 rounded-xl transition shadow-lg shadow-sky-900 mt-2 ${lockedUntil && Date.now() < lockedUntil ? 'bg-slate-600 text-slate-400 cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-500 text-white'}`}
+                        >
                             Acessar Painel
                         </button>
                     </form>
