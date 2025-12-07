@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Store, Upload, X, MapPin, Lock } from 'lucide-react';
+import { ArrowLeft, User, Store, Upload, X, MapPin, Briefcase, ShoppingBag } from 'lucide-react';
 import { Button, Input } from '../components/UI';
 import { useAppContext } from '../App';
 import { UserType, CATEGORIES } from '../types';
@@ -11,12 +11,19 @@ export const Register: React.FC = () => {
   const { state, dispatch } = useAppContext();
   const [activeTab, setActiveTab] = useState<UserType>(UserType.USER);
 
+  // Vendor Subtype State
+  const [vendorSubtype, setVendorSubtype] = useState<'COMMERCE' | 'SERVICE'>('COMMERCE');
+
   // Common State
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [address, setAddress] = useState('');
+  
+  // Address State (Separated)
+  const [street, setStreet] = useState('');
+  const [number, setNumber] = useState('');
+  const [neighborhood, setNeighborhood] = useState('');
   
   // User Specific
   const [userCPF, setUserCPF] = useState('');
@@ -72,7 +79,7 @@ export const Register: React.FC = () => {
     e.preventDefault();
     
     // Validation
-    if (!name || !email || !address || !password) {
+    if (!name || !email || !street || !neighborhood || !password) {
         alert("Preencha todos os campos obrigatórios.");
         return;
     }
@@ -86,6 +93,9 @@ export const Register: React.FC = () => {
         alert("As senhas não coincidem.");
         return;
     }
+
+    // Address Composition
+    const fullAddress = `${street}, ${number || 'S/N'} - ${neighborhood} - Campo Largo/PR`;
 
     // --- CHECK 1: Banned Documents OR Emails ---
     const documentToCheck = activeTab === UserType.USER ? userCPF : vendorDoc;
@@ -129,7 +139,7 @@ export const Register: React.FC = () => {
             name,
             email,
             cpf: userCPF,
-            address: `${address} - Campo Largo/PR`, // Enforce City
+            address: fullAddress,
             type: UserType.USER,
             photoUrl: photoPreview || undefined,
             password: password
@@ -181,7 +191,7 @@ export const Register: React.FC = () => {
             name,
             document: vendorDoc,
             phone,
-            address: `${address} - Campo Largo/PR`, // Enforce City
+            address: fullAddress,
             categories: [finalCategory],
             description,
             website: finalWebsite, 
@@ -212,15 +222,13 @@ export const Register: React.FC = () => {
             photoUrl: photoPreview || undefined
         };
         
-        // We add to users list strictly for login purposes, usually systems separate this but for this local DB app it works fine
-        // Note: Check if email exists in users to avoid collision if they try to register vendor with same email as user
         const isDuplicateEmailUser = state.users.some(u => u.email === email);
         if(!isDuplicateEmailUser) {
              dispatch({ type: 'ADD_USER', payload: vendorUser });
         }
 
         dispatch({ type: 'LOGIN', payload: vendorUser });
-        alert("Comércio cadastrado com sucesso!");
+        alert("Cadastro realizado com sucesso!");
         navigate('/');
     }
   };
@@ -237,19 +245,19 @@ export const Register: React.FC = () => {
             <p className="text-gray-500">Faça parte do O Que Tem Perto?</p>
         </div>
 
-        {/* Tabs */}
+        {/* Top Tabs */}
         <div className="flex bg-white p-1 rounded-xl shadow-sm mb-6 border border-gray-100">
             <button 
-                className={`flex-1 py-2 rounded-lg text-sm font-semibold flex items-center justify-center transition-all ${activeTab === UserType.USER ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
+                className={`flex-1 py-3 rounded-lg text-sm font-semibold flex items-center justify-center transition-all ${activeTab === UserType.USER ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
                 onClick={() => setActiveTab(UserType.USER)}
             >
-                <User size={16} className="mr-2" /> Sou Cliente
+                <User size={18} className="mr-2" /> Sou Cliente
             </button>
             <button 
-                className={`flex-1 py-2 rounded-lg text-sm font-semibold flex items-center justify-center transition-all ${activeTab === UserType.VENDOR ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
+                className={`flex-1 py-3 rounded-lg text-sm font-semibold flex items-center justify-center transition-all ${activeTab === UserType.VENDOR ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
                 onClick={() => setActiveTab(UserType.VENDOR)}
             >
-                <Store size={16} className="mr-2" /> Sou Negócio
+                <Store size={18} className="mr-2" /> Sou Negócio
             </button>
         </div>
 
@@ -257,16 +265,49 @@ export const Register: React.FC = () => {
             
             <form onSubmit={handleRegister} className="animate-slide-up">
                 
-                <h3 className="font-bold text-gray-800 mb-4 border-b pb-2">
-                    {activeTab === UserType.VENDOR ? 'Detalhes do Negócio' : 'Dados Pessoais'}
+                {/* Vendor Subtype Selection */}
+                {activeTab === UserType.VENDOR && (
+                    <div className="mb-6">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Qual seu tipo de atividade?</label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div 
+                                onClick={() => setVendorSubtype('COMMERCE')}
+                                className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center justify-center transition-all ${vendorSubtype === 'COMMERCE' ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-gray-200 hover:border-sky-200'}`}
+                            >
+                                <ShoppingBag size={24} className="mb-1" />
+                                <span className="text-xs font-bold">Comércio / Loja</span>
+                            </div>
+                            <div 
+                                onClick={() => setVendorSubtype('SERVICE')}
+                                className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col items-center justify-center transition-all ${vendorSubtype === 'SERVICE' ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-gray-200 hover:border-sky-200'}`}
+                            >
+                                <Briefcase size={24} className="mb-1" />
+                                <span className="text-xs font-bold">Prestador de Serviço</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <h3 className="font-bold text-gray-800 mb-4 border-b pb-2 flex items-center gap-2">
+                    {activeTab === UserType.VENDOR 
+                        ? (vendorSubtype === 'COMMERCE' ? 'Dados da Loja' : 'Dados do Profissional') 
+                        : 'Dados Pessoais'}
                 </h3>
 
-                {/* Common Fields */}
-                <Input label={activeTab === UserType.VENDOR ? "Nome do Negócio (Fantasia)" : "Nome Completo"} value={name} onChange={e => setName(e.target.value)} required />
+                {/* Name & Email */}
+                <Input 
+                    label={activeTab === UserType.VENDOR 
+                        ? (vendorSubtype === 'COMMERCE' ? "Nome Fantasia da Loja" : "Nome do Profissional / Serviço") 
+                        : "Nome Completo"} 
+                    value={name} 
+                    onChange={e => setName(e.target.value)} 
+                    required 
+                />
                 <Input label="E-mail de Acesso" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
                 
+                {/* Passwords */}
                 <div className="grid grid-cols-2 gap-4">
-                    <Input label="Senha" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 dígitos" required />
+                    <Input label="Senha" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 6 dígitos" required />
                     <Input label="Confirmar Senha" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
                 </div>
 
@@ -278,9 +319,16 @@ export const Register: React.FC = () => {
                 {/* Vendor Specific */}
                 {activeTab === UserType.VENDOR && (
                     <>
-                        <Input label="CNPJ ou CPF (Autônomo)" placeholder="Documento do negócio" value={vendorDoc} onChange={e => setVendorDoc(e.target.value)} required />
-                        <Input label="Telefone / WhatsApp" placeholder="(00) 00000-0000" value={phone} onChange={e => setPhone(e.target.value)} required />
+                        <Input 
+                            label={vendorSubtype === 'COMMERCE' ? "CNPJ" : "CPF ou CNPJ"} 
+                            placeholder="Documento oficial" 
+                            value={vendorDoc} 
+                            onChange={e => setVendorDoc(e.target.value)} 
+                            required 
+                        />
+                        <Input label="Telefone / WhatsApp" placeholder="(41) 99999-9999" value={phone} onChange={e => setPhone(e.target.value)} required />
                         
+                        {/* Categories */}
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700 mb-1">Categoria Principal</label>
                             <select 
@@ -313,8 +361,9 @@ export const Register: React.FC = () => {
                             )}
                         </div>
 
+                        {/* Social Links */}
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Link Principal</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Link Principal (Opcional)</label>
                             <div className="flex rounded-lg shadow-sm">
                                 <select
                                     value={linkType}
@@ -337,38 +386,67 @@ export const Register: React.FC = () => {
                     </>
                 )}
 
-                <Input label="Endereço (Rua, Número, Bairro)" placeholder="Ex: Rua XV de Novembro, 100, Centro" value={address} onChange={e => setAddress(e.target.value)} required />
-                
-                {/* Location Restriction Message */}
-                <div className="mb-6 flex items-center gap-2 bg-sky-50 border border-sky-200 p-3 rounded-lg text-sky-800 text-sm font-medium">
-                    <MapPin size={18} className="flex-shrink-0" />
-                    <span>Cidade: <strong>Campo Largo - PR</strong> (Exclusivo)</span>
+                {/* ADDRESS SECTION - SEPARATED */}
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4 mt-2">
+                    <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                        <MapPin size={16} /> Endereço em Campo Largo
+                    </h4>
+                    
+                    <Input 
+                        label="Rua / Logradouro" 
+                        placeholder="Ex: Rua XV de Novembro" 
+                        value={street} 
+                        onChange={e => setStreet(e.target.value)} 
+                        required 
+                        className="bg-white"
+                    />
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input 
+                            label="Número" 
+                            placeholder="Ex: 100" 
+                            value={number} 
+                            onChange={e => setNumber(e.target.value)} 
+                            className="bg-white"
+                        />
+                        <Input 
+                            label="Bairro" 
+                            placeholder="Ex: Centro" 
+                            value={neighborhood} 
+                            onChange={e => setNeighborhood(e.target.value)} 
+                            required 
+                            className="bg-white"
+                        />
+                    </div>
+                    
+                    <div className="flex items-center gap-2 mt-2 text-sky-700 text-xs font-medium">
+                        <div className="w-2 h-2 rounded-full bg-sky-500"></div>
+                        Cidade fixa: <strong>Campo Largo - PR</strong>
+                    </div>
                 </div>
                 
                 {activeTab === UserType.VENDOR && (
                     <>
                         {/* PRIVACY SETTINGS */}
                         <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
-                            <h4 className="text-sm font-bold text-blue-900 mb-2">Configurações de Privacidade</h4>
-                            <p className="text-xs text-blue-700 mb-3">Escolha quais dados serão visíveis publicamente na busca:</p>
-                            
+                            <h4 className="text-sm font-bold text-blue-900 mb-2">Privacidade</h4>
                             <div className="space-y-2">
                                 <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
                                     <input type="checkbox" checked={showPhone} onChange={e => setShowPhone(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                                    <span>Exibir meu Telefone/WhatsApp</span>
+                                    <span>Exibir Telefone</span>
                                 </label>
                                 <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
                                     <input type="checkbox" checked={showAddress} onChange={e => setShowAddress(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                                    <span>Exibir meu Endereço no Perfil</span>
+                                    <span>Exibir Endereço Completo</span>
                                 </label>
                                 <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
                                     <input type="checkbox" checked={showWebsite} onChange={e => setShowWebsite(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                                    <span>Exibir meu Link/Site</span>
+                                    <span>Exibir Site/Link</span>
                                 </label>
                             </div>
                         </div>
 
-                        <Input label="Descrição Curta" multiline value={description} onChange={e => setDescription(e.target.value)} />
+                        <Input label="Descrição Curta" placeholder="Descreva seus serviços ou produtos..." multiline value={description} onChange={e => setDescription(e.target.value)} />
                         
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700 mb-1">Foto do Local ou Perfil</label>
@@ -389,7 +467,7 @@ export const Register: React.FC = () => {
                                 ) : (
                                     <>
                                         <Upload className="mx-auto text-gray-400 mb-2" />
-                                        <span className="text-sm text-gray-500 block">Clique para enviar uma foto</span>
+                                        <span className="text-sm text-gray-500 block">Clique para enviar foto</span>
                                         <span className="text-xs text-gray-400 block mt-1">(JPG, PNG)</span>
                                     </>
                                 )}
@@ -427,8 +505,8 @@ export const Register: React.FC = () => {
                      </div>
                 )}
 
-                <Button fullWidth type="submit" className="mt-4">
-                    {activeTab === UserType.VENDOR ? 'Cadastrar Comércio' : 'Criar Conta'}
+                <Button fullWidth type="submit" className="mt-4 py-4 text-lg shadow-lg shadow-sky-200">
+                    {activeTab === UserType.VENDOR ? 'Finalizar Cadastro' : 'Criar Conta'}
                 </Button>
             </form>
         </div>

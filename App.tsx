@@ -1,8 +1,8 @@
 
-import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, Suspense, lazy } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, Suspense, lazy, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera } from 'lucide-react';
-import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum } from './types';
+import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera, Upload, X, MapPin } from 'lucide-react';
+import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum, CATEGORIES } from './types';
 import { getUserLocation, calculateDistance } from './services/geoService';
 import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo } from './components/UI';
 import { INITIAL_DB } from './database';
@@ -78,14 +78,32 @@ const reducer = (state: AppState, action: Action): AppState => {
       newState = { ...state, users: [...state.users, action.payload] };
       break;
     case 'UPDATE_USER':
-      // Update in list
+      // Update in user list
       const updatedUsers = state.users.map(u => u.id === action.payload.id ? action.payload : u);
+      
+      // If it's a vendor-type user, we also need to update the vendor list to keep data in sync
+      let updatedVendors = state.vendors;
+      if (action.payload.type === UserEnum.VENDOR) {
+          updatedVendors = state.vendors.map(v => 
+              v.id === action.payload.id ? { 
+                  ...v, 
+                  name: action.payload.name, 
+                  address: action.payload.address,
+                  photoUrl: action.payload.photoUrl || v.photoUrl,
+                  // Map other extended fields if passed in payload
+                  phone: (action.payload as any).phone || v.phone,
+                  categories: (action.payload as any).categories || v.categories,
+                  description: (action.payload as any).description || v.description
+              } : v
+          );
+      }
+
       // Update currentUser if it's the same person (to reflect changes immediately in UI)
       const updatedCurrentUser = state.currentUser && state.currentUser.id === action.payload.id 
           ? { ...state.currentUser, ...action.payload } 
           : state.currentUser;
           
-      newState = { ...state, users: updatedUsers, currentUser: updatedCurrentUser };
+      newState = { ...state, users: updatedUsers, vendors: updatedVendors, currentUser: updatedCurrentUser };
       break;
     case 'UPDATE_VENDOR':
       newState = { ...state, vendors: state.vendors.map(v => v.id === action.payload.id ? { ...v, ...action.payload } : v) };
@@ -267,17 +285,55 @@ const SettingsPage: React.FC = () => {
     // Edit Profile State
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [editName, setEditName] = useState('');
-    const [editAddress, setEditAddress] = useState('');
     const [editPhoto, setEditPhoto] = useState('');
+    
+    // Separated Address Edit
+    const [editStreet, setEditStreet] = useState('');
+    const [editNumber, setEditNumber] = useState('');
+    const [editNeighborhood, setEditNeighborhood] = useState('');
+
+    // Vendor Specific Edit
+    const [editPhone, setEditPhone] = useState('');
+    const [editDescription, setEditDescription] = useState('');
+    const [editCategory, setEditCategory] = useState('');
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Load user data into edit modal
     useEffect(() => {
         if (state.currentUser && isEditProfileOpen) {
             setEditName(state.currentUser.name);
-            setEditAddress(state.currentUser.address);
             setEditPhoto(state.currentUser.photoUrl || '');
+            
+            // Try to parse existing address string back to fields
+            const fullAddress = state.currentUser.address || '';
+            const parts = fullAddress.split(',');
+            if (parts.length >= 2) {
+                setEditStreet(parts[0].trim());
+                // Handle Number and Neighborhood
+                const rest = parts.slice(1).join(',');
+                const dashParts = rest.split('-');
+                if (dashParts.length >= 1) {
+                    setEditNumber(dashParts[0].trim());
+                }
+                if (dashParts.length >= 2) {
+                    setEditNeighborhood(dashParts[1].trim());
+                }
+            } else {
+                setEditStreet(fullAddress);
+            }
+
+            // Load Vendor specific data if available
+            if (state.currentUser.type === UserEnum.VENDOR) {
+                const vendorData = state.vendors.find(v => v.id === state.currentUser?.id);
+                if (vendorData) {
+                    setEditPhone(vendorData.phone);
+                    setEditDescription(vendorData.description);
+                    setEditCategory(vendorData.categories[0] || '');
+                }
+            }
         }
-    }, [isEditProfileOpen, state.currentUser]);
+    }, [isEditProfileOpen, state.currentUser, state.vendors]);
 
     const handleLogout = () => {
         if(confirm("Tem certeza que deseja sair?")) {
@@ -327,15 +383,35 @@ const SettingsPage: React.FC = () => {
         setConfirmPass('');
     };
 
+    const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setEditPhoto(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleSaveProfile = () => {
         if (!state.currentUser) return;
         
-        const updatedUser = {
+        const fullAddress = `${editStreet}, ${editNumber} - ${editNeighborhood} - Campo Largo/PR`;
+
+        const updatedUser: any = {
             ...state.currentUser,
             name: editName,
-            address: editAddress,
-            photoUrl: editPhoto
+            address: fullAddress,
+            photoUrl: editPhoto,
         };
+
+        // If vendor, add specific fields to payload
+        if (state.currentUser.type === UserEnum.VENDOR) {
+            updatedUser.phone = editPhone;
+            updatedUser.description = editDescription;
+            updatedUser.categories = [editCategory];
+        }
         
         dispatch({ type: 'UPDATE_USER', payload: updatedUser });
         alert("Perfil atualizado com sucesso!");
@@ -371,7 +447,7 @@ const SettingsPage: React.FC = () => {
                                 </div>
                                 <button 
                                     onClick={() => setIsEditProfileOpen(true)}
-                                    className="p-2 text-sky-600 bg-sky-50 rounded-full hover:bg-sky-100"
+                                    className="p-2 text-sky-600 bg-sky-50 rounded-full hover:bg-sky-100 shadow-sm"
                                 >
                                     <Edit3 size={18} />
                                 </button>
@@ -465,7 +541,7 @@ const SettingsPage: React.FC = () => {
                 )}
                 
                 <div className="text-center pt-8 pb-4">
-                    <p className="text-xs text-gray-400">Versão do App: 1.7.0 (PWA)</p>
+                    <p className="text-xs text-gray-400">Versão do App: 1.7.5 (PWA)</p>
                 </div>
              </div>
              
@@ -481,23 +557,62 @@ const SettingsPage: React.FC = () => {
 
              {/* Edit Profile Modal */}
              <Modal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} title="Editar Meus Dados">
-                 <div className="space-y-4">
-                     <Input label="Nome Completo" value={editName} onChange={e => setEditName(e.target.value)} />
-                     <Input label="Endereço" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
+                 <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+                     <Input label="Nome" value={editName} onChange={e => setEditName(e.target.value)} />
                      
-                     <div className="mb-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">URL da Foto</label>
-                        <div className="flex gap-2">
-                            <input 
-                                className="flex-1 w-full px-4 py-2 border border-gray-200 rounded-lg outline-none"
-                                value={editPhoto}
-                                onChange={e => setEditPhoto(e.target.value)}
-                                placeholder="https://..."
-                            />
-                            {editPhoto && <img src={editPhoto} className="w-10 h-10 rounded object-cover border" alt="Prev" />}
+                     <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Endereço</label>
+                        <Input label="Rua / Logradouro" value={editStreet} onChange={e => setEditStreet(e.target.value)} className="bg-white" />
+                        <div className="grid grid-cols-2 gap-2">
+                             <Input label="Número" value={editNumber} onChange={e => setEditNumber(e.target.value)} className="bg-white" />
+                             <Input label="Bairro" value={editNeighborhood} onChange={e => setEditNeighborhood(e.target.value)} className="bg-white" />
                         </div>
                      </div>
-                     <p className="text-xs text-gray-500 mb-4">* Para alterar e-mail ou documento, entre em contato com o suporte.</p>
+
+                     {state.currentUser?.type === UserEnum.VENDOR && (
+                         <>
+                            <Input label="Telefone / WhatsApp" value={editPhone} onChange={e => setEditPhone(e.target.value)} />
+                            <div className="mb-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                                <select 
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white outline-none"
+                                    value={editCategory}
+                                    onChange={(e) => setEditCategory(e.target.value)}
+                                >
+                                    {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                </select>
+                            </div>
+                            <Input label="Descrição" multiline value={editDescription} onChange={e => setEditDescription(e.target.value)} />
+                         </>
+                     )}
+                     
+                     <div className="mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Alterar Foto</label>
+                        <div className="flex gap-2 items-center">
+                            <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex-shrink-0">
+                                {editPhoto ? (
+                                    <img src={editPhoto} className="w-full h-full object-cover" alt="Prev" />
+                                ) : (
+                                    <User className="w-full h-full p-4 text-gray-300" />
+                                )}
+                            </div>
+                            <div className="flex-1">
+                                <button 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-full py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 flex items-center justify-center gap-2"
+                                >
+                                    <Upload size={16} /> Carregar Nova Foto
+                                </button>
+                                <input 
+                                    ref={fileInputRef} 
+                                    type="file" 
+                                    className="hidden" 
+                                    accept="image/*"
+                                    onChange={handlePhotoFileChange}
+                                />
+                            </div>
+                        </div>
+                     </div>
                      
                      <Button fullWidth onClick={handleSaveProfile}>Salvar Alterações</Button>
                  </div>
@@ -524,10 +639,16 @@ const AdminLogin: React.FC = () => {
                 dispatch({ type: 'LOGIN', payload: dbMaster });
                 navigate('/admin');
                 return;
+            } else {
+                // IMPORTANT: If user exists in DB but password is wrong, FAIL here.
+                // Do NOT fall through to the hardcoded default below, or a user who changed their password
+                // could still be hacked by someone using the default password.
+                alert("Senha incorreta.");
+                return;
             }
         } 
         
-        // 2. Fallback check for Master default credentials (if not in DB or password mismatch handled above but double check for safety)
+        // 2. Fallback ONLY if Master User is NOT in DB yet (First run or wiped DB)
         if (email === 'crinf.informatica@gmail.com' && password === 'Crinf!2025#') {
              const masterUser: UserType = {
                 id: 'master_crinf',
@@ -714,6 +835,27 @@ const Login: React.FC = () => {
             alert("Muitas tentativas incorretas. O login foi bloqueado temporariamente por 5 minutos.");
         } else {
             alert(`Senha incorreta ou Usuário não encontrado. Tentativa ${newAttempts} de 3.`);
+        }
+    };
+
+    const handleSendForgotEmail = async () => {
+        const serviceID = 'service_dtvvjp8';
+        const templateID = 'template_8cthxoh';
+        const publicKey = 'NJZigwymrvB_gdLNP'; // YOUR_PUBLIC_KEY
+
+        const templateParams = {
+            to_email: email,
+            to_name: 'Usuário',
+            message: 'Solicitação de recuperação de acesso. Se você não solicitou, ignore este e-mail.'
+        };
+
+        try {
+            // @ts-ignore
+            await window.emailjs.send(serviceID, templateID, templateParams, publicKey);
+            alert("Um link de recuperação foi enviado para o seu e-mail. Verifique sua caixa de entrada.");
+        } catch (error) {
+            console.error('FAILED...', error);
+            alert("Erro ao enviar e-mail. Verifique se o e-mail está correto.");
         }
     };
 
