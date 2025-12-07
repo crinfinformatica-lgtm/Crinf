@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy } from 'lucide-react';
+import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera } from 'lucide-react';
 import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum } from './types';
 import { getUserLocation, calculateDistance } from './services/geoService';
 import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo } from './components/UI';
@@ -78,7 +78,14 @@ const reducer = (state: AppState, action: Action): AppState => {
       newState = { ...state, users: [...state.users, action.payload] };
       break;
     case 'UPDATE_USER':
-      newState = { ...state, users: state.users.map(u => u.id === action.payload.id ? action.payload : u) };
+      // Update in list
+      const updatedUsers = state.users.map(u => u.id === action.payload.id ? action.payload : u);
+      // Update currentUser if it's the same person (to reflect changes immediately in UI)
+      const updatedCurrentUser = state.currentUser && state.currentUser.id === action.payload.id 
+          ? { ...state.currentUser, ...action.payload } 
+          : state.currentUser;
+          
+      newState = { ...state, users: updatedUsers, currentUser: updatedCurrentUser };
       break;
     case 'UPDATE_VENDOR':
       newState = { ...state, vendors: state.vendors.map(v => v.id === action.payload.id ? { ...v, ...action.payload } : v) };
@@ -257,6 +264,21 @@ const SettingsPage: React.FC = () => {
     const [newPass, setNewPass] = useState('');
     const [confirmPass, setConfirmPass] = useState('');
 
+    // Edit Profile State
+    const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+    const [editName, setEditName] = useState('');
+    const [editAddress, setEditAddress] = useState('');
+    const [editPhoto, setEditPhoto] = useState('');
+
+    // Load user data into edit modal
+    useEffect(() => {
+        if (state.currentUser && isEditProfileOpen) {
+            setEditName(state.currentUser.name);
+            setEditAddress(state.currentUser.address);
+            setEditPhoto(state.currentUser.photoUrl || '');
+        }
+    }, [isEditProfileOpen, state.currentUser]);
+
     const handleLogout = () => {
         if(confirm("Tem certeza que deseja sair?")) {
             dispatch({ type: 'LOGOUT' });
@@ -305,6 +327,21 @@ const SettingsPage: React.FC = () => {
         setConfirmPass('');
     };
 
+    const handleSaveProfile = () => {
+        if (!state.currentUser) return;
+        
+        const updatedUser = {
+            ...state.currentUser,
+            name: editName,
+            address: editAddress,
+            photoUrl: editPhoto
+        };
+        
+        dispatch({ type: 'UPDATE_USER', payload: updatedUser });
+        alert("Perfil atualizado com sucesso!");
+        setIsEditProfileOpen(false);
+    };
+
     const isAdminOrMaster = state.currentUser?.type === UserEnum.ADMIN || state.currentUser?.type === UserEnum.MASTER;
 
     return (
@@ -314,21 +351,31 @@ const SettingsPage: React.FC = () => {
                  
                  {state.currentUser ? (
                      <div className="flex items-center gap-4">
-                         <div className="w-16 h-16 bg-sky-100 rounded-full flex items-center justify-center border-4 border-white shadow-md overflow-hidden">
+                         <div className="w-16 h-16 bg-sky-100 rounded-full flex items-center justify-center border-4 border-white shadow-md overflow-hidden relative group">
                              {state.currentUser.photoUrl ? (
                                  <img src={state.currentUser.photoUrl} alt="Perfil" className="w-full h-full object-cover" />
                              ) : (
                                  <User size={32} className="text-sky-500" />
                              )}
                          </div>
-                         <div>
-                             <h2 className="text-lg font-bold text-gray-800">{state.currentUser.name}</h2>
-                             <p className="text-sm text-gray-500">{state.currentUser.email}</p>
-                             <span className="text-[10px] bg-sky-50 text-sky-600 px-2 py-0.5 rounded-full border border-sky-100 font-semibold uppercase mt-1 inline-block">
-                                {state.currentUser.type === UserEnum.MASTER ? 'Conta Master' : 
-                                 state.currentUser.type === UserEnum.ADMIN ? 'Administrador' : 
-                                 state.currentUser.type === UserEnum.VENDOR ? 'Conta Comercial' : 'Cliente'}
-                             </span>
+                         <div className="flex-1">
+                             <div className="flex justify-between items-start">
+                                <div>
+                                    <h2 className="text-lg font-bold text-gray-800">{state.currentUser.name}</h2>
+                                    <p className="text-sm text-gray-500">{state.currentUser.email}</p>
+                                    <span className="text-[10px] bg-sky-50 text-sky-600 px-2 py-0.5 rounded-full border border-sky-100 font-semibold uppercase mt-1 inline-block">
+                                        {state.currentUser.type === UserEnum.MASTER ? 'Conta Master' : 
+                                        state.currentUser.type === UserEnum.ADMIN ? 'Administrador' : 
+                                        state.currentUser.type === UserEnum.VENDOR ? 'Conta Comercial' : 'Cliente'}
+                                    </span>
+                                </div>
+                                <button 
+                                    onClick={() => setIsEditProfileOpen(true)}
+                                    className="p-2 text-sky-600 bg-sky-50 rounded-full hover:bg-sky-100"
+                                >
+                                    <Edit3 size={18} />
+                                </button>
+                             </div>
                          </div>
                      </div>
                  ) : (
@@ -431,6 +478,30 @@ const SettingsPage: React.FC = () => {
                      <Button fullWidth onClick={handleChangePassword}>Salvar Nova Senha</Button>
                  </div>
              </Modal>
+
+             {/* Edit Profile Modal */}
+             <Modal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} title="Editar Meus Dados">
+                 <div className="space-y-4">
+                     <Input label="Nome Completo" value={editName} onChange={e => setEditName(e.target.value)} />
+                     <Input label="Endereço" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
+                     
+                     <div className="mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">URL da Foto</label>
+                        <div className="flex gap-2">
+                            <input 
+                                className="flex-1 w-full px-4 py-2 border border-gray-200 rounded-lg outline-none"
+                                value={editPhoto}
+                                onChange={e => setEditPhoto(e.target.value)}
+                                placeholder="https://..."
+                            />
+                            {editPhoto && <img src={editPhoto} className="w-10 h-10 rounded object-cover border" alt="Prev" />}
+                        </div>
+                     </div>
+                     <p className="text-xs text-gray-500 mb-4">* Para alterar e-mail ou documento, entre em contato com o suporte.</p>
+                     
+                     <Button fullWidth onClick={handleSaveProfile}>Salvar Alterações</Button>
+                 </div>
+             </Modal>
         </div>
     );
 };
@@ -445,7 +516,18 @@ const AdminLogin: React.FC = () => {
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // 1. MASTER CREDENTIALS CHECK
+        // 1. Check DB first for Master User (allows custom password)
+        const dbMaster = state.users.find(u => u.email === 'crinf.informatica@gmail.com');
+        
+        if (dbMaster) {
+            if (dbMaster.password === password) {
+                dispatch({ type: 'LOGIN', payload: dbMaster });
+                navigate('/admin');
+                return;
+            }
+        } 
+        
+        // 2. Fallback check for Master default credentials (if not in DB or password mismatch handled above but double check for safety)
         if (email === 'crinf.informatica@gmail.com' && password === 'Crinf!2025#') {
              const masterUser: UserType = {
                 id: 'master_crinf',
@@ -454,14 +536,17 @@ const AdminLogin: React.FC = () => {
                 cpf: '000.000.000-00',
                 address: 'Sede Administrativa',
                 type: UserEnum.MASTER,
-                photoUrl: undefined
+                photoUrl: undefined,
+                password: 'Crinf!2025#'
             };
+            // If logging in via hardcode, sync to DB so future edits work
+            dispatch({ type: 'ADD_USER', payload: masterUser });
             dispatch({ type: 'LOGIN', payload: masterUser });
             navigate('/admin');
             return;
         }
 
-        // 2. OTHER ADMINS CHECK
+        // 3. OTHER ADMINS CHECK
         const foundUser = state.users.find(u => u.email === email && u.type === UserEnum.ADMIN);
         
         if (foundUser) {
@@ -473,6 +558,27 @@ const AdminLogin: React.FC = () => {
             }
         } else {
             alert("Credenciais inválidas ou usuário sem permissão.");
+        }
+    };
+
+    const handleSendForgotEmail = async () => {
+        const serviceID = 'service_dtvvjp8';
+        const templateID = 'template_8cthxoh';
+        const publicKey = 'NJZigwymrvB_gdLNP'; // YOUR_PUBLIC_KEY
+
+        const templateParams = {
+            to_email: 'crinf.informatica@gmail.com',
+            to_name: 'Master Crinf',
+            message: 'Você solicitou a redefinição de senha do painel administrativo. Acesse o painel para definir uma nova senha se possível ou contate o suporte técnico.'
+        };
+
+        try {
+            // @ts-ignore
+            await window.emailjs.send(serviceID, templateID, templateParams, publicKey);
+            alert("Um link de recuperação foi enviado para o seu e-mail (crinf.informatica@gmail.com). Verifique sua caixa de entrada.");
+        } catch (error) {
+            console.error('FAILED...', error);
+            alert("Erro ao enviar e-mail. Verifique o console ou a configuração do EmailJS.");
         }
     };
 
@@ -520,6 +626,13 @@ const AdminLogin: React.FC = () => {
                         </button>
                     </form>
                     
+                    <button 
+                        onClick={handleSendForgotEmail}
+                        className="w-full mt-4 text-xs text-slate-500 hover:text-sky-400 underline transition-colors"
+                    >
+                        Esqueci a senha
+                    </button>
+
                     <div className="mt-8 text-center border-t border-slate-700 pt-6">
                         <button 
                             onClick={() => navigate('/login')}

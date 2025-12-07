@@ -111,8 +111,11 @@ export const AdminDashboard: React.FC = () => {
       if (!editingItem) return;
 
       if (editingItem.dataType === 'user') {
-          // Master Protection check
-          if (editingItem.email === 'crinf.informatica@gmail.com') {
+          // Master Protection check: 
+          // Allow edit ONLY if it's the current user (Master editing self)
+          const isEditingSelf = state.currentUser?.id === editingItem.id;
+          
+          if (editingItem.email === 'crinf.informatica@gmail.com' && !isEditingSelf) {
               alert("Não é permitido alterar o usuário Master.");
               return;
           }
@@ -240,7 +243,12 @@ export const AdminDashboard: React.FC = () => {
                 </div>
 
                 <div className="space-y-3">
-                    {state.users.map(user => (
+                    {state.users.map(user => {
+                        // Allow edit if it's not Master OR if it's Master editing themselves
+                        const isMasterUser = user.email === 'crinf.informatica@gmail.com';
+                        const canEdit = !isMasterUser || (isMasterUser && state.currentUser?.id === user.id);
+
+                        return (
                         <div key={user.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center group hover:shadow-md transition-all">
                             <div className="flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${user.type === UserType.MASTER ? 'bg-purple-600' : user.type === UserType.ADMIN ? 'bg-sky-600' : 'bg-gray-400'}`}>
@@ -257,18 +265,17 @@ export const AdminDashboard: React.FC = () => {
                                 </div>
                             </div>
                             
-                            {/* Actions - Protect Master User */}
-                            {user.email !== 'crinf.informatica@gmail.com' && (
-                                <div className="flex gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {isMaster && (
-                                        <button
-                                            onClick={() => handleResetPassword(user.id, user.name)}
-                                            className="p-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100"
-                                            title="Zerar Senha para '123456'"
-                                        >
-                                            <KeyRound size={16} />
-                                        </button>
-                                    )}
+                            <div className="flex gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                {isMaster && !isMasterUser && (
+                                    <button
+                                        onClick={() => handleResetPassword(user.id, user.name)}
+                                        className="p-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100"
+                                        title="Zerar Senha para '123456'"
+                                    >
+                                        <KeyRound size={16} />
+                                    </button>
+                                )}
+                                {canEdit && (
                                     <button 
                                         onClick={() => openEditModal(user, 'user')}
                                         className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"
@@ -276,24 +283,28 @@ export const AdminDashboard: React.FC = () => {
                                     >
                                         <Edit2 size={16} />
                                     </button>
-                                    <button 
-                                        onClick={() => handleBan(user, 'user')}
-                                        className="p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100"
-                                        title="Banir"
-                                    >
-                                        <Ban size={16} />
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDelete(user.id, 'user')}
-                                        className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
-                                        title="Excluir"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-                            )}
+                                )}
+                                {!isMasterUser && (
+                                    <>
+                                        <button 
+                                            onClick={() => handleBan(user, 'user')}
+                                            className="p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100"
+                                            title="Banir"
+                                        >
+                                            <Ban size={16} />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDelete(user.id, 'user')}
+                                            className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
+                                            title="Excluir"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </div>
-                    ))}
+                    )})}
                 </div>
             </div>
         )}
@@ -385,7 +396,7 @@ export const AdminDashboard: React.FC = () => {
                                 </div>
                                 <button 
                                     onClick={() => handleUnban(doc)}
-                                    className="text-xs font-bold text-green-600 hover:text-green-700 hover:underline"
+                                    className="text-xs font-bold text-green-600 hover:text-green-700 hover:underline border border-green-200 bg-green-50 px-3 py-1 rounded"
                                 >
                                     Remover Bloqueio
                                 </button>

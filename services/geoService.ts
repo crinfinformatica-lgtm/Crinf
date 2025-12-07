@@ -5,8 +5,12 @@ const CAMPO_LARGO_CENTER = { lat: -25.4594, lng: -49.5292 };
 
 export const getUserLocation = (): Promise<Location> => {
   return new Promise((resolve, reject) => {
+    // Check if geolocation is supported by the browser
     if (!navigator.geolocation) {
-      reject(new Error("Geolocation not supported"));
+      const msg = "Seu navegador não suporta geolocalização. Usando localização padrão.";
+      alert(msg);
+      // Resolve with fallback so the app continues to work
+      resolve(CAMPO_LARGO_CENTER);
       return;
     }
 
@@ -18,7 +22,23 @@ export const getUserLocation = (): Promise<Location> => {
         });
       },
       (error) => {
-        console.warn("Error getting location, using fallback:", error);
+        let errorMsg = "Erro desconhecido ao obter localização.";
+        
+        // Determine specific error message
+        switch(error.code) {
+            case error.PERMISSION_DENIED:
+                errorMsg = "Permissão de localização negada pelo usuário.";
+                break;
+            case error.POSITION_UNAVAILABLE:
+                errorMsg = "Informações de localização indisponíveis (GPS desligado ou sem sinal).";
+                break;
+            case error.TIMEOUT:
+                errorMsg = "O tempo para obter a localização esgotou.";
+                break;
+        }
+        
+        console.warn(`GPS Error: ${errorMsg}. Usando fallback (Centro de Campo Largo).`, error);
+        
         // Fallback to Campo Largo center if permission denied or error
         resolve(CAMPO_LARGO_CENTER);
       },
