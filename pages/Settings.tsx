@@ -46,6 +46,7 @@ export const SettingsPage: React.FC = () => {
     const [editPhone, setEditPhone] = useState('');
     const [editDescription, setEditDescription] = useState('');
     const [editCategory, setEditCategory] = useState('');
+    const [isEditCustomCategory, setIsEditCustomCategory] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const isAdminOrMaster = state.currentUser?.type === UserEnum.ADMIN || state.currentUser?.type === UserEnum.MASTER;
@@ -76,7 +77,16 @@ export const SettingsPage: React.FC = () => {
                 if (vendorData) {
                     setEditPhone(vendorData.phone);
                     setEditDescription(vendorData.description);
-                    setEditCategory(vendorData.categories[0] || '');
+                    
+                    const currentCat = vendorData.categories[0] || '';
+                    setEditCategory(currentCat);
+
+                    // Check if current category is custom (not in standard list)
+                    if (currentCat && !CATEGORIES.includes(currentCat)) {
+                        setIsEditCustomCategory(true);
+                    } else {
+                        setIsEditCustomCategory(false);
+                    }
                     
                     // Priority: If vendor has a specific photo, use it. If not, fallback to user photo.
                     if (vendorData.photoUrl) {
@@ -175,28 +185,28 @@ export const SettingsPage: React.FC = () => {
         setSavingStatus("Iniciando...");
         
         try {
-            let photoUrlToSave = editPhoto;
+            let finalPhotoUrl = editPhoto;
 
-            // Upload image if it is base64 (new upload)
+            // 1. Upload image if it is base64 (new upload)
             if (editPhoto && editPhoto.startsWith('data:')) {
                 setSavingStatus("Enviando imagem...");
                 const fileName = `profile_${Date.now()}.jpg`;
-                // Always store in a consistent path for the ID
+                // Use consistent path logic
                 const path = `users/${state.currentUser.id}/${fileName}`;
                 
                 // Wait for upload to get the fixed URL
-                photoUrlToSave = await uploadImageToFirebase(editPhoto, path);
+                finalPhotoUrl = await uploadImageToFirebase(editPhoto, path);
             }
 
             setSavingStatus("Atualizando dados...");
             const fullAddress = `${editStreet}, ${editNumber} - ${editNeighborhood} - Campo Largo/PR`;
 
-            // 1. Update User Record (Login/Header)
+            // 2. Prepare User Object (Login/Header)
             const updatedUser: any = {
                 ...state.currentUser,
                 name: editName,
                 address: fullAddress,
-                photoUrl: photoUrlToSave,
+                photoUrl: finalPhotoUrl,
             };
 
             if (state.currentUser.type === UserEnum.VENDOR) {
@@ -205,10 +215,10 @@ export const SettingsPage: React.FC = () => {
                 updatedUser.categories = [editCategory];
             }
             
-            // Dispatch User Update (Saves to users collection)
+            // 3. Dispatch User Update (Saves to users collection)
             dispatch({ type: 'UPDATE_USER', payload: updatedUser });
 
-            // 2. Explicitly Update Vendor Record (Public List) using direct update
+            // 4. Explicitly Update Vendor Record (Public List) using direct DB call
             if (state.currentUser.type === UserEnum.VENDOR) {
                 const vendorUpdates = {
                     name: editName,
@@ -216,23 +226,22 @@ export const SettingsPage: React.FC = () => {
                     phone: editPhone,
                     description: editDescription,
                     categories: [editCategory],
-                    photoUrl: photoUrlToSave // Ensure this is the static Storage URL
+                    photoUrl: finalPhotoUrl // CRITICAL: Force the new URL here
                 };
 
+                console.log("Saving Vendor Data:", vendorUpdates);
+
                 // Use direct update service to guarantee DB write without relying on full local state
-                // This uses setDoc(..., {merge: true}) so it creates if missing
                 await updateVendorPartial(state.currentUser.id, vendorUpdates);
                 
-                // Trigger local update for immediate UI feedback
+                // 5. Update Local State for Vendor List immediately so UI reflects change without refresh
                 const existingVendor = state.vendors.find(v => v.id === state.currentUser?.id);
                 if (existingVendor) {
+                    const newVendorState = { ...existingVendor, ...vendorUpdates };
                     dispatch({ 
                         type: 'UPDATE_VENDOR', 
-                        payload: { ...existingVendor, ...vendorUpdates } 
+                        payload: newVendorState
                     });
-                } else {
-                     // In case vendor wasn't loaded locally yet, force a reload or optimistic add would be needed
-                     // But dispatch UPDATE_VENDOR handles saveToFirebase too, so redundant but safe
                 }
             }
 
@@ -419,11 +428,31 @@ export const SettingsPage: React.FC = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
                                 <select 
                                     className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white outline-none"
-                                    value={editCategory}
-                                    onChange={(e) => setEditCategory(e.target.value)}
+                                    value={isEditCustomCategory ? 'OTHER' : editCategory}
+                                    onChange={(e) => {
+                                        if (e.target.value === 'OTHER') {
+                                            setIsEditCustomCategory(true);
+                                            setEditCategory('');
+                                        } else {
+                                            setIsEditCustomCategory(false);
+                                            setEditCategory(e.target.value);
+                                        }
+                                    }}
                                 >
                                     {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                    <option value="OTHER">+ Outra (Adicionar Nova)</option>
                                 </select>
+                                {isEditCustomCategory && (
+                                    <div className="mt-2 animate-fade-in">
+                                        <Input 
+                                            label="Digite a nova categoria"
+                                            value={editCategory} 
+                                            onChange={(e) => setEditCategory(e.target.value)} 
+                                            placeholder="Ex: Pet Shop, Artesanato..."
+                                            autoFocus
+                                        />
+                                    </div>
+                                )}
                             </div>
                             <Input label="Descrição" multiline value={editDescription} onChange={e => setEditDescription(e.target.value)} />
                          </>

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock, Mail } from 'lucide-react';
+import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock, Mail, Smartphone } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Button, Input, Modal, TwoFactorModal } from '../components/UI';
 import { UserType, User as IUser, Vendor } from '../types';
@@ -177,9 +177,23 @@ export const AdminDashboard: React.FC = () => {
       if (editingItem.dataType === 'user') {
           const isEditingSelf = state.currentUser?.id === editingItem.id;
           
+          // 1. Proteger usuário Master de edições externas, mas permitir que ele se edite
           if (editingItem.email === 'crinf.informatica@gmail.com' && !isEditingSelf) {
               alert("Não é permitido alterar o usuário Master.");
               return;
+          }
+
+          // 2. Validação de Email Duplicado (Se o e-mail foi alterado)
+          if (editEmail !== editingItem.email) {
+              const emailExists = state.users.some(u => u.email.toLowerCase() === editEmail.toLowerCase() && u.id !== editingItem.id);
+              if (emailExists) {
+                  alert("Erro: Este e-mail já está cadastrado para outro usuário.");
+                  return;
+              }
+              // Confirmação de segurança ao alterar e-mail
+              if (!confirm(`ATENÇÃO: Você está alterando o e-mail de login de ${editingItem.name}.\n\nDe: ${editingItem.email}\nPara: ${editEmail}\n\nO usuário precisará usar o NOVO e-mail para entrar. Continuar?`)) {
+                  return;
+              }
           }
 
           const updatedUser = {
@@ -190,7 +204,16 @@ export const AdminDashboard: React.FC = () => {
               address: editAddress,
               type: editType
           };
+          
           dispatch({ type: 'UPDATE_USER', payload: updatedUser });
+          
+          if (editEmail !== editingItem.email) {
+             dispatch({ 
+                type: 'ADD_SECURITY_LOG', 
+                payload: { action: 'PASSWORD_CHANGE', details: `Admin alterou email de ${editingItem.email} para ${editEmail}` } 
+             });
+          }
+
       } else {
           const updatedVendor = {
               ...editingItem,
@@ -274,11 +297,57 @@ export const AdminDashboard: React.FC = () => {
       }
   };
 
-  const copyLink = () => {
+  // Robust Copy Link Function
+  const copyLink = async () => {
       const url = window.location.href.split('#')[0];
-      navigator.clipboard.writeText(url);
-      setCopied(true);
+      
+      try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+              await navigator.clipboard.writeText(url);
+              setCopied(true);
+          } else {
+              // Fallback for older browsers or insecure contexts
+              const textArea = document.createElement("textarea");
+              textArea.value = url;
+              document.body.appendChild(textArea);
+              textArea.focus();
+              textArea.select();
+              try {
+                  document.execCommand('copy');
+                  setCopied(true);
+              } catch (err) {
+                  console.error('Fallback copy failed', err);
+                  alert('Não foi possível copiar automaticamente. Selecione e copie o link acima.');
+              }
+              document.body.removeChild(textArea);
+          }
+      } catch (err) {
+          console.error('Copy failed', err);
+          alert('Erro ao copiar link.');
+      }
+      
       setTimeout(() => setCopied(false), 2000);
+  };
+
+  // Native Share Function
+  const handleNativeShare = async () => {
+      const shareData = {
+          title: 'O Que Tem Perto?',
+          text: 'Gerencie ou acesse o aplicativo O Que Tem Perto.',
+          url: window.location.href.split('#')[0]
+      };
+
+      if (navigator.share) {
+          try {
+              await navigator.share(shareData);
+          } catch (err) {
+              console.log('Error sharing', err);
+          }
+      } else {
+          // Fallback to manual copy if native share not supported
+          copyLink();
+          alert('Compartilhamento nativo não suportado neste navegador. Link copiado!');
+      }
   };
 
   const isMaster = state.currentUser?.type === UserType.MASTER;
@@ -530,22 +599,33 @@ export const AdminDashboard: React.FC = () => {
 
                  <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                      <h3 className="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2">
-                         <Globe size={16} /> Link Direto
+                         <Globe size={16} /> Link & Compartilhamento
                      </h3>
+                     
                      <div className="flex gap-2 mb-2">
-                         <div className="flex-1 bg-gray-50 border border-gray-200 rounded px-2 py-1 text-xs text-gray-600 truncate font-mono">
+                         <div className="flex-1 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-xs text-gray-600 truncate font-mono">
                              {window.location.href.split('#')[0]}
                          </div>
-                         <button onClick={copyLink} className={`px-2 rounded font-bold transition-all text-xs text-white ${copied ? 'bg-green-500' : 'bg-gray-800'}`}>
+                         <button 
+                             onClick={copyLink} 
+                             className={`px-3 rounded font-bold transition-all text-xs text-white flex items-center gap-1 ${copied ? 'bg-green-500' : 'bg-gray-800'}`}
+                         >
                              {copied ? <Check size={14} /> : <Copy size={14} />}
+                             {copied ? 'Copiado' : 'Copiar'}
                          </button>
                      </div>
-                     <Button fullWidth variant="primary" icon={<Share2 size={14} />} onClick={() => {
-                            const text = `Acesse nosso app: ${window.location.href.split('#')[0]}`;
-                            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-                        }} className="py-2 text-xs bg-green-600 hover:bg-green-700">
-                         Enviar WhatsApp
-                     </Button>
+
+                     <div className="grid grid-cols-2 gap-2">
+                         <Button variant="primary" icon={<Smartphone size={14} />} onClick={handleNativeShare} className="py-2 text-xs bg-blue-600 hover:bg-blue-700">
+                             Compartilhar via Sistema
+                         </Button>
+                         <Button variant="primary" icon={<Share2 size={14} />} onClick={() => {
+                                const text = `Acesse nosso app: ${window.location.href.split('#')[0]}`;
+                                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                            }} className="py-2 text-xs bg-green-600 hover:bg-green-700">
+                             WhatsApp
+                         </Button>
+                     </div>
                  </div>
              </div>
         )}
