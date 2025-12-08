@@ -439,9 +439,11 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
     if (isOpen && !sentCode && !isSending) {
       setIsSending(true);
       const generated = Math.floor(100000 + Math.random() * 900000).toString();
+      const dest = destination || 'crinf.informatica@gmail.com';
       
       const emailParams = {
-        to_email: destination || 'crinf.informatica@gmail.com', 
+        to_email: dest, 
+        email: dest, // Add explicit email field for templates that use {{email}}
         to_name: 'Usuário',
         subject: 'Código de Verificação de 2 Fatores',
         message: `Seu código de verificação é: ${generated}`

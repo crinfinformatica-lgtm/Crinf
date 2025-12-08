@@ -791,6 +791,7 @@ const AdminLogin: React.FC = () => {
 
         const templateParams = {
             to_email: 'crinf.informatica@gmail.com',
+            email: 'crinf.informatica@gmail.com', // Added redundant email param
             to_name: 'Master Crinf',
             subject: 'Recuperação de Acesso',
             message: `Você solicitou a redefinição de senha. 
@@ -990,7 +991,7 @@ const Login: React.FC = () => {
             return;
         }
 
-        const userExists = state.users.find(u => u.email === forgotEmail);
+        const userExists = state.users.find(u => u.email.toLowerCase() === forgotEmail.toLowerCase());
         if (!userExists) {
             alert("E-mail não encontrado no sistema.");
             return;
@@ -1005,7 +1006,8 @@ const Login: React.FC = () => {
         const resetLink = `${window.location.href.split('#')[0]}#/reset-password?id=${userExists.id}`;
 
         const templateParams = {
-            to_email: forgotEmail,
+            to_email: userExists.email,
+            email: userExists.email, // Added redundant email param
             to_name: userExists.name,
             subject: 'Recuperação de Senha',
             message: `Você solicitou a recuperação de senha. 

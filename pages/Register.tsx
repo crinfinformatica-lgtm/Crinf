@@ -70,6 +70,12 @@ export const Register: React.FC = () => {
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+          alert("A foto selecionada é muito grande. O limite máximo é de 5MB.");
+          e.target.value = '';
+          return;
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setImageToCrop(reader.result as string);
@@ -205,6 +211,11 @@ export const Register: React.FC = () => {
                 }
             }
         }
+        
+        // Use a fixed seed for random photo if none uploaded to avoid "dancing" images on refresh
+        // Fix: Ensure date stamp is string for seed consistency
+        const seed = Date.now().toString();
+        const fallbackPhoto = `https://picsum.photos/seed/${seed}/400/300`;
 
         const newVendor = {
             id: Date.now().toString(),
@@ -215,7 +226,7 @@ export const Register: React.FC = () => {
             categories: [finalCategory],
             description,
             website: finalWebsite, 
-            photoUrl: photoPreview || "https://picsum.photos/400/300",
+            photoUrl: photoPreview || fallbackPhoto,
             rating: 0,
             reviewCount: 0,
             reviews: [],
@@ -239,7 +250,7 @@ export const Register: React.FC = () => {
             address: newVendor.address, 
             type: UserType.VENDOR,
             password: password,
-            photoUrl: photoPreview || undefined
+            photoUrl: photoPreview || fallbackPhoto
         };
         
         const isDuplicateEmailUser = state.users.some(u => u.email === email);
@@ -500,7 +511,7 @@ export const Register: React.FC = () => {
                                     <>
                                         <Upload className="mx-auto text-gray-400 mb-2" />
                                         <span className="text-sm text-gray-500 block">Clique para enviar e ajustar</span>
-                                        <span className="text-xs text-gray-400 block mt-1">(JPG, PNG)</span>
+                                        <span className="text-xs text-gray-400 block mt-1">(JPG, PNG - Máx 5MB)</span>
                                     </>
                                 )}
                                 <input 
@@ -528,8 +539,11 @@ export const Register: React.FC = () => {
                                     <button onClick={removePhoto} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow z-10"><X size={14} /></button>
                                 </>
                             ) : (
-                                <div className="flex items-center gap-2 text-gray-400">
-                                    <Upload size={20} /> <span className="text-sm">Enviar e Ajustar Foto</span>
+                                <div className="flex flex-col items-center justify-center text-gray-400">
+                                    <div className="flex items-center gap-2">
+                                        <Upload size={20} /> <span className="text-sm">Enviar e Ajustar Foto</span>
+                                    </div>
+                                    <span className="text-[10px] mt-1">(Máx 5MB)</span>
                                 </div>
                             )}
                             <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handlePhotoChange}/>
