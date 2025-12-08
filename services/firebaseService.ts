@@ -87,6 +87,53 @@ export const signInWithGoogle = async (): Promise<{ user: User | null, isNewUser
     }
 };
 
+// --- SECURITY & LOCKING ---
+
+export const recordFailedLogin = async (user: User) => {
+    try {
+        const userRef = doc(db, "users", user.id);
+        const currentAttempts = (user.failedLoginAttempts || 0) + 1;
+        
+        let updates: any = { failedLoginAttempts: currentAttempts };
+        
+        // If attempts >= 3, lock for 5 minutes
+        if (currentAttempts >= 3) {
+            updates.lockedUntil = Date.now() + 5 * 60 * 1000;
+        }
+
+        await updateDoc(userRef, updates);
+        return currentAttempts;
+    } catch (e) {
+        console.error("Erro ao registrar falha de login:", e);
+    }
+};
+
+export const successfulLogin = async (user: User) => {
+    try {
+        const userRef = doc(db, "users", user.id);
+        // Reset counters on success
+        await updateDoc(userRef, { 
+            failedLoginAttempts: 0,
+            lockedUntil: 0 
+        });
+    } catch (e) {
+        console.error("Erro ao limpar dados de login:", e);
+    }
+};
+
+export const unlockUserAccount = async (userId: string) => {
+    try {
+        const userRef = doc(db, "users", userId);
+        await updateDoc(userRef, { 
+            failedLoginAttempts: 0,
+            lockedUntil: 0 
+        });
+    } catch (e) {
+        console.error("Erro ao desbloquear usuário:", e);
+        throw e;
+    }
+};
+
 // --- SYNC FUNCTIONS (REALTIME) ---
 
 export const subscribeToUsers = (callback: (users: User[]) => void) => {

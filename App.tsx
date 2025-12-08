@@ -5,7 +5,7 @@ import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, 
 import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum, CATEGORIES, SecurityLog } from './types';
 import { getUserLocation, calculateDistance } from './services/geoService';
 import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo, ImageCropper, GoogleLoginButton } from './components/UI';
-import { subscribeToUsers, subscribeToVendors, subscribeToBanned, saveUserToFirebase, saveVendorToFirebase, deleteUserFromFirebase, deleteVendorFromFirebase, banItemInFirebase, unbanItemInFirebase, seedInitialData } from './services/firebaseService';
+import { subscribeToUsers, subscribeToVendors, subscribeToBanned, saveUserToFirebase, saveVendorToFirebase, deleteUserFromFirebase, deleteVendorFromFirebase, banItemInFirebase, unbanItemInFirebase, seedInitialData, recordFailedLogin, successfulLogin, unlockUserAccount } from './services/firebaseService';
 
 // --- CONSTANTS ---
 const CURRENT_DB_VERSION = '2.0'; 
@@ -62,6 +62,7 @@ type Action =
   | { type: 'CHANGE_OWN_PASSWORD'; payload: { id: string; newPass: string } }
   | { type: 'ADD_SECURITY_LOG'; payload: Omit<SecurityLog, 'id' | 'timestamp'> }
   | { type: 'CLEAR_SECURITY_LOGS' }
+  | { type: 'UNLOCK_USER'; payload: string }
   | { type: 'FACTORY_RESET' };
 
 const reducer = (state: AppState, action: Action): AppState => {
@@ -150,6 +151,9 @@ const reducer = (state: AppState, action: Action): AppState => {
        if (state.currentUser && state.currentUser.id === action.payload.id) {
            newState = { ...state, currentUser: { ...state.currentUser, password: action.payload.newPass } };
        }
+       break;
+    case 'UNLOCK_USER':
+       unlockUserAccount(action.payload);
        break;
     case 'ADD_SECURITY_LOG':
        newState = { ...state, securityLogs: [action.payload as any, ...state.securityLogs] };
@@ -909,27 +913,7 @@ const Login: React.FC = () => {
     const [forgotEmail, setForgotEmail] = useState('');
     const [isSendingForgot, setIsSendingForgot] = useState(false);
 
-    const [failedAttempts, setFailedAttempts] = useState(0);
-    const [lockoutTime, setLockoutTime] = useState<number | null>(null);
-
-    const checkLockout = () => {
-        if (lockoutTime) {
-            if (Date.now() < lockoutTime) {
-                const remaining = Math.ceil((lockoutTime - Date.now()) / 60000);
-                alert(`Muitas tentativas falhas. Por segurança, aguarde ${remaining} minutos para tentar novamente.`);
-                return true; 
-            } else {
-                setLockoutTime(null);
-                setFailedAttempts(0);
-                return false;
-            }
-        }
-        return false;
-    };
-
-    const handleLogin = () => {
-        if (checkLockout()) return;
-
+    const handleLogin = async () => {
         if (email.toLowerCase() === 'crinf.informatica@gmail.com') {
             alert("Esta conta possui privilégios elevados. Por favor, utilize a área de 'Acesso Administrativo'.");
             navigate('/admin-login');
@@ -939,36 +923,41 @@ const Login: React.FC = () => {
         const foundUser = state.users.find(u => u.email === email) as any;
         
         if (foundUser) {
+            // Check for persistent ban
             if (state.bannedDocuments.includes(foundUser.cpf) || state.bannedDocuments.includes(foundUser.email)) {
                 alert("Acesso negado: Esta conta foi banida permanentemente pelo administrador.");
+                return;
+            }
+
+            // Check for persistent lockout (DB based)
+            if (foundUser.lockedUntil && foundUser.lockedUntil > Date.now()) {
+                const remaining = Math.ceil((foundUser.lockedUntil - Date.now()) / 60000);
+                alert(`Conta bloqueada por excesso de tentativas. Tente novamente em ${remaining} minutos ou contate o suporte.`);
                 return;
             }
 
             const storedPass = foundUser.password || '123'; 
 
             if (password === storedPass) {
+                // Successful Login
+                await successfulLogin(foundUser); // Reset lock counters
                 if (password === '123456') {
                     alert("Sua senha foi redefinida pelo administrador para '123456'. Recomendamos alterá-la em Ajustes.");
                 }
                 dispatch({ type: 'LOGIN', payload: foundUser });
                 navigate('/');
             } else {
-                handleFailedAttempt();
+                // Failed Login
+                const attempts = await recordFailedLogin(foundUser);
+                if (attempts && attempts >= 3) {
+                     alert("Muitas tentativas incorretas. Sua conta foi bloqueada por 5 minutos.");
+                } else {
+                     alert(`Senha incorreta. Tentativa ${attempts || 1} de 3.`);
+                }
             }
         } else {
-             handleFailedAttempt();
-        }
-    };
-
-    const handleFailedAttempt = () => {
-        const newAttempts = failedAttempts + 1;
-        setFailedAttempts(newAttempts);
-        if (newAttempts >= 3) {
-            const lockoutDuration = 5 * 60 * 1000;
-            setLockoutTime(Date.now() + lockoutDuration);
-            alert("Muitas tentativas incorretas. O login foi bloqueado temporariamente por 5 minutos.");
-        } else {
-            alert(`Senha incorreta ou Usuário não encontrado. Tentativa ${newAttempts} de 3.`);
+             // User not found
+             alert("Usuário não encontrado ou senha incorreta.");
         }
     };
     
@@ -1051,13 +1040,7 @@ const Login: React.FC = () => {
             <p className="text-gray-500 mb-8 text-center font-medium">Acesse sua conta para continuar.</p>
             
             <div className="w-full space-y-4 bg-white/80 backdrop-blur-xl p-6 rounded-3xl border border-white shadow-xl">
-                {lockoutTime && Date.now() < lockoutTime && (
-                    <div className="bg-red-50 border border-red-200 p-3 rounded-xl flex items-center gap-2 text-red-700 text-sm font-bold mb-2 animate-pulse">
-                        <Clock size={16} />
-                        Login bloqueado temporariamente.
-                    </div>
-                )}
-
+                
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs font-bold text-gray-500 ml-1 mb-1 block">E-mail ou Usuário</label>

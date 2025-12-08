@@ -54,6 +54,8 @@ export interface User {
   type: UserType;
   photoUrl?: string; // For Google Auth
   password?: string; // Added optional password field
+  failedLoginAttempts?: number; // Track failed attempts
+  lockedUntil?: number; // Timestamp for lockout end
 }
 
 export interface Location {
@@ -64,7 +66,7 @@ export interface Location {
 export interface SecurityLog {
   id: string;
   timestamp: number;
-  action: 'LOGIN_SUCCESS' | 'LOGIN_FAIL' | 'PASSWORD_CHANGE' | 'BAN_ACTION' | 'DB_RESET';
+  action: 'LOGIN_SUCCESS' | 'LOGIN_FAIL' | 'PASSWORD_CHANGE' | 'BAN_ACTION' | 'DB_RESET' | 'UNLOCK_USER';
   details: string;
   ip?: string; // Simulated in frontend
 }

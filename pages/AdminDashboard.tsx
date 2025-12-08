@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database } from 'lucide-react';
+import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Button, Input, Modal, TwoFactorModal } from '../components/UI';
 import { UserType, User as IUser, Vendor } from '../types';
@@ -112,11 +112,34 @@ export const AdminDashboard: React.FC = () => {
   const handleUnban = (doc: string) => {
       dispatch({ type: 'UNBAN_DOCUMENT', payload: doc });
   };
+
+  const handleUnlockUser = (userId: string) => {
+      if (confirm("Deseja desbloquear este usuário imediatamente?")) {
+          dispatch({ type: 'UNLOCK_USER', payload: userId });
+          dispatch({ 
+              type: 'ADD_SECURITY_LOG', 
+              payload: { action: 'UNLOCK_USER', details: `Usuário ${userId} desbloqueado pelo Admin.` } 
+          });
+      }
+  };
   
-  const handleResetPassword = (userId: string, userName: string) => {
-      if (confirm(`Zerar a senha do usuário ${userName} para '123456'?`)) {
-          dispatch({ type: 'MASTER_RESET_PASSWORD', payload: userId });
-          alert(`Senha de ${userName} foi redefinida para: 123456`);
+  const handleResetPassword = (targetUser: IUser) => {
+      // Logic for secure reset
+      const isTargetPrivileged = targetUser.type === UserType.ADMIN || targetUser.type === UserType.MASTER;
+
+      const executeReset = () => {
+          if (confirm(`Zerar a senha do usuário ${targetUser.name} para '123456'?`)) {
+              dispatch({ type: 'MASTER_RESET_PASSWORD', payload: targetUser.id });
+              alert(`Senha de ${targetUser.name} foi redefinida para: 123456`);
+          }
+      };
+
+      if (isTargetPrivileged) {
+          setActionTitle("Resetar Senha de Admin/Master");
+          setPendingAction(() => executeReset);
+          set2FAOpen(true);
+      } else {
+          executeReset();
       }
   };
 
@@ -290,9 +313,10 @@ export const AdminDashboard: React.FC = () => {
                     {state.users.map(user => {
                         const isMasterUser = user.email === 'crinf.informatica@gmail.com';
                         const canEdit = !isMasterUser || (isMasterUser && state.currentUser?.id === user.id);
+                        const isLocked = user.lockedUntil && user.lockedUntil > Date.now();
 
                         return (
-                        <div key={user.id} className="bg-white p-3 rounded-xl shadow-sm border border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                        <div key={user.id} className={`bg-white p-3 rounded-xl shadow-sm border flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 ${isLocked ? 'border-red-200 bg-red-50' : 'border-gray-200'}`}>
                             <div className="flex items-center gap-3">
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${user.type === UserType.MASTER ? 'bg-purple-600' : user.type === UserType.ADMIN ? 'bg-sky-600' : 'bg-gray-400'}`}>
                                     {user.name[0]}
@@ -302,14 +326,18 @@ export const AdminDashboard: React.FC = () => {
                                         <h3 className="font-bold text-sm text-gray-800">{user.name}</h3>
                                         {user.type === UserType.MASTER && <span className="bg-purple-100 text-purple-700 text-[10px] px-1 rounded font-bold border border-purple-200">MASTER</span>}
                                         {user.type === UserType.ADMIN && <span className="bg-sky-100 text-sky-700 text-[10px] px-1 rounded font-bold border border-sky-200">ADMIN</span>}
+                                        {isLocked && <span className="bg-red-100 text-red-700 text-[10px] px-1 rounded font-bold border border-red-200 flex items-center gap-1"><Lock size={8}/> BLOQUEADO</span>}
                                     </div>
                                     <p className="text-[10px] text-gray-500">{user.email}</p>
                                 </div>
                             </div>
                             
                             <div className="flex gap-2 justify-end">
+                                {isLocked && (
+                                     <button onClick={() => handleUnlockUser(user.id)} className="p-1.5 bg-green-50 text-green-600 rounded hover:bg-green-100 border border-green-200" title="Desbloquear Acesso"><Unlock size={14} /></button>
+                                )}
                                 {isMaster && !isMasterUser && (
-                                    <button onClick={() => handleResetPassword(user.id, user.name)} className="p-1.5 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100" title="Zerar Senha"><KeyRound size={14} /></button>
+                                    <button onClick={() => handleResetPassword(user)} className="p-1.5 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100" title="Zerar Senha"><KeyRound size={14} /></button>
                                 )}
                                 {canEdit && (
                                     <button onClick={() => openEditModal(user, 'user')} className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><Edit2 size={14} /></button>
@@ -346,7 +374,10 @@ export const AdminDashboard: React.FC = () => {
                             
                             <div className="flex gap-2 justify-end border-t border-gray-50 pt-2">
                                 {isMaster && (
-                                    <button onClick={() => handleResetPassword(vendor.id, vendor.name)} className="p-1.5 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100"><KeyRound size={14} /></button>
+                                    <button onClick={() => {
+                                        const linkedUser = state.users.find(u => u.id === vendor.id);
+                                        if (linkedUser) handleResetPassword(linkedUser);
+                                    }} className="p-1.5 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100"><KeyRound size={14} /></button>
                                 )}
                                 <button onClick={() => openEditModal(vendor, 'vendor')} className="flex-1 py-1 bg-blue-50 text-blue-700 rounded text-[10px] font-bold hover:bg-blue-100 flex items-center justify-center gap-1"><Edit2 size={12} /> Editar</button>
                                 <button onClick={() => handleBan(vendor, 'vendor')} className="flex-1 py-1 bg-orange-50 text-orange-700 rounded text-[10px] font-bold hover:bg-orange-100 flex items-center justify-center gap-1"><Ban size={12} /> Banir</button>
