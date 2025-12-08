@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, Suspense, lazy, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera, Upload, X, MapPin } from 'lucide-react';
+import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera, Upload, X, MapPin, Heart, Check } from 'lucide-react';
 import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum, CATEGORIES, SecurityLog } from './types';
 import { getUserLocation, calculateDistance } from './services/geoService';
 import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo, ImageCropper, GoogleLoginButton } from './components/UI';
@@ -310,6 +310,11 @@ const SettingsPage: React.FC = () => {
     const [editName, setEditName] = useState('');
     const [editPhoto, setEditPhoto] = useState('');
     
+    // Donation State
+    const [isDonationOpen, setDonationOpen] = useState(false);
+    const [isPixCopied, setIsPixCopied] = useState(false);
+    const pixKey = "crinf.negocios@gmail.com";
+    
     // Cropper State
     const [imageToCrop, setImageToCrop] = useState<string | null>(null);
     
@@ -444,6 +449,12 @@ const SettingsPage: React.FC = () => {
         alert("Perfil atualizado com sucesso!");
         setIsEditProfileOpen(false);
     };
+    
+    const handleCopyPix = () => {
+        navigator.clipboard.writeText(pixKey);
+        setIsPixCopied(true);
+        setTimeout(() => setIsPixCopied(false), 2000);
+    };
 
     const isAdminOrMaster = state.currentUser?.type === UserEnum.ADMIN || state.currentUser?.type === UserEnum.MASTER;
 
@@ -527,7 +538,7 @@ const SettingsPage: React.FC = () => {
                         <ChevronRight size={16} className="text-gray-300" />
                     </div>
 
-                    <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50">
+                    <div className="p-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50">
                         <div className="flex items-center gap-3">
                             <Moon size={20} className="text-gray-400" />
                             <span className="text-gray-700 font-medium">Modo Escuro</span>
@@ -535,6 +546,17 @@ const SettingsPage: React.FC = () => {
                         <div className="w-10 h-6 bg-gray-200 rounded-full relative">
                             <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
                         </div>
+                    </div>
+
+                    <div 
+                        onClick={() => setDonationOpen(true)}
+                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-red-50 group transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <Heart size={20} className="text-red-400 group-hover:fill-red-400 transition-all" />
+                            <span className="text-gray-700 font-medium group-hover:text-red-500">Apoie o Projeto</span>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-300" />
                     </div>
                 </div>
 
@@ -632,6 +654,38 @@ const SettingsPage: React.FC = () => {
                      </div>
                      
                      <Button fullWidth onClick={handleSaveProfile}>Salvar Alterações</Button>
+                 </div>
+             </Modal>
+
+             {/* Donation Modal */}
+             <Modal isOpen={isDonationOpen} onClose={() => setDonationOpen(false)} title="Apoie o Projeto">
+                 <div className="text-center space-y-4">
+                     <p className="text-sm text-gray-600 leading-relaxed">
+                         Contribua com o desenvolvimento do aplicativo realizando qualquer valor de doação.
+                     </p>
+                     
+                     <div className="bg-white p-4 rounded-xl border border-gray-200 inline-block shadow-sm">
+                         <img 
+                             src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${pixKey}`} 
+                             alt="QR Code Pix" 
+                             className="w-48 h-48"
+                         />
+                     </div>
+                     
+                     <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                         <p className="text-xs text-gray-500 mb-1">Chave Pix (E-mail)</p>
+                         <p className="font-mono text-sm font-bold text-gray-800 break-all">{pixKey}</p>
+                     </div>
+
+                     <Button 
+                        onClick={handleCopyPix} 
+                        fullWidth 
+                        variant="outline"
+                        className={isPixCopied ? "bg-green-50 border-green-200 text-green-700" : ""}
+                        icon={isPixCopied ? <Check size={18} /> : <Copy size={18} />}
+                     >
+                         {isPixCopied ? "Chave Copiada!" : "Copiar Chave Pix"}
+                     </Button>
                  </div>
              </Modal>
 
@@ -746,12 +800,21 @@ const AdminLogin: React.FC = () => {
         };
 
         try {
+            // Check if emailjs is loaded
+            // @ts-ignore
+            if (!window.emailjs) {
+                throw new Error("Biblioteca de email não carregada.");
+            }
+
             // @ts-ignore
             await window.emailjs.send(serviceID, templateID, templateParams, publicKey);
             alert("Um link de recuperação foi enviado para o seu e-mail (crinf.informatica@gmail.com). Verifique sua caixa de entrada.");
-        } catch (error) {
+        } catch (error: any) {
             console.error('FAILED...', error);
-            alert("Erro ao enviar e-mail. Verifique o console ou a configuração do EmailJS.");
+            // More specific error message
+            let msg = "Erro ao enviar e-mail.";
+            if (error.text) msg += ` Detalhes: ${error.text}`;
+            alert(msg + " Tente novamente mais tarde.");
         }
     };
 
@@ -952,14 +1015,23 @@ const Login: React.FC = () => {
         };
 
         try {
+            // Check library
+            // @ts-ignore
+            if (!window.emailjs) {
+                throw new Error("Biblioteca de email não carregada.");
+            }
+
             // @ts-ignore
             await window.emailjs.send(serviceID, templateID, templateParams, publicKey);
             alert(`E-mail enviado para ${forgotEmail}. Verifique sua caixa de entrada.`);
             setForgotOpen(false);
             setForgotEmail('');
-        } catch (error) {
+        } catch (error: any) {
             console.error('FAILED...', error);
-            alert("Erro ao enviar e-mail. Tente novamente mais tarde.");
+            // More specific error message
+            let msg = "Erro ao enviar e-mail.";
+            if (error.text) msg += ` Detalhes: ${error.text}`;
+            alert(msg + " Tente novamente mais tarde.");
         } finally {
             setIsSendingForgot(false);
         }
