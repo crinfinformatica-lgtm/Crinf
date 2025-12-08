@@ -1,6 +1,6 @@
 
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, User, Store, Upload, X, MapPin, Briefcase, ShoppingBag } from 'lucide-react';
 import { Button, Input, ImageCropper } from '../components/UI';
 import { useAppContext } from '../App';
@@ -8,6 +8,7 @@ import { UserType, CATEGORIES } from '../types';
 
 export const Register: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation(); // Hook to get data passed from Login
   const { state, dispatch } = useAppContext();
   const [activeTab, setActiveTab] = useState<UserType>(UserType.USER);
 
@@ -52,6 +53,19 @@ export const Register: React.FC = () => {
   // Social Link State
   const [linkType, setLinkType] = useState('Instagram');
   const [linkValue, setLinkValue] = useState('');
+
+  const [isGoogleRegister, setIsGoogleRegister] = useState(false);
+
+  // Pre-fill data if coming from Google Login
+  useEffect(() => {
+      if (location.state && location.state.googleData) {
+          const { name, email, photoUrl } = location.state.googleData;
+          setName(name || '');
+          setEmail(email || '');
+          setPhotoPreview(photoUrl || null);
+          setIsGoogleRegister(true);
+      }
+  }, [location.state]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -127,10 +141,11 @@ export const Register: React.FC = () => {
 
     if (activeTab === UserType.USER) {
         // --- CHECK 2: Duplicate Users ---
+        // Although Firebase service handles this, checking locally in state for instant feedback is good UX
         const isDuplicateEmail = state.users.some(u => u.email === email);
         const isDuplicateCPF = state.users.some(u => u.cpf === userCPF);
         
-        if (isDuplicateEmail) {
+        if (isDuplicateEmail && !isGoogleRegister) {
             alert("Erro: Já existe um usuário cadastrado com este e-mail.");
             return;
         }
@@ -308,11 +323,23 @@ export const Register: React.FC = () => {
                     onChange={e => setName(e.target.value)} 
                     required 
                 />
-                <Input label="E-mail de Acesso" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
                 
-                {/* Passwords */}
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">E-mail de Acesso</label>
+                    <input 
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${isGoogleRegister ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white border-gray-200'}`}
+                        type="email" 
+                        value={email} 
+                        onChange={e => setEmail(e.target.value)} 
+                        required 
+                        readOnly={isGoogleRegister} // Lock email if coming from Google
+                    />
+                    {isGoogleRegister && <p className="text-xs text-sky-600 mt-1">E-mail vinculado à conta Google.</p>}
+                </div>
+                
+                {/* Passwords - Required even for Google (backup access) */}
                 <div className="grid grid-cols-2 gap-4">
-                    <Input label="Senha" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 6 dígitos" required />
+                    <Input label="Senha (Backup)" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 6 dígitos" required />
                     <Input label="Confirmar Senha" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
                 </div>
 

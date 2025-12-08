@@ -4,7 +4,7 @@ import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, us
 import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera, Upload, X, MapPin } from 'lucide-react';
 import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum, CATEGORIES, SecurityLog } from './types';
 import { getUserLocation, calculateDistance } from './services/geoService';
-import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo, ImageCropper } from './components/UI';
+import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo, ImageCropper, GoogleLoginButton } from './components/UI';
 import { subscribeToUsers, subscribeToVendors, subscribeToBanned, saveUserToFirebase, saveVendorToFirebase, deleteUserFromFirebase, deleteVendorFromFirebase, banItemInFirebase, unbanItemInFirebase, seedInitialData } from './services/firebaseService';
 
 // --- CONSTANTS ---
@@ -196,7 +196,7 @@ const BottomNav = () => {
   const location = useLocation();
   const { state } = useAppContext();
   
-  if (['/register', '/login', '/admin-login'].includes(location.pathname)) return null;
+  if (['/register', '/login', '/admin-login', '/reset-password'].includes(location.pathname)) return null;
 
   const navClass = (path: string) => 
     `flex flex-col items-center p-2 text-xs font-medium transition-colors ${location.pathname === path ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`;
@@ -237,6 +237,62 @@ const BottomNav = () => {
       </Link>
     </div>
   );
+};
+
+// --- Reset Password Page ---
+const ResetPasswordPage: React.FC = () => {
+    const [searchParams] = useSearchParams();
+    const { state, dispatch } = useAppContext();
+    const navigate = useNavigate();
+    const [pass, setPass] = useState('');
+    const [confirm, setConfirm] = useState('');
+    
+    // Get ID from URL
+    const userId = searchParams.get('id');
+
+    const handleSubmit = () => {
+        if (!pass || !confirm) {
+            alert("Preencha todos os campos.");
+            return;
+        }
+        if (pass !== confirm) {
+            alert("As senhas não conferem.");
+            return;
+        }
+        if (!userId) {
+            alert("Link inválido. Solicite novamente.");
+            return;
+        }
+
+        dispatch({
+            type: 'CHANGE_OWN_PASSWORD',
+            payload: { id: userId, newPass: pass }
+        });
+
+        alert("Senha redefinida com sucesso! Faça login.");
+        navigate('/login');
+    };
+
+    if (!userId) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-6 bg-sky-50">
+                <p className="text-gray-600">Link de redefinição inválido ou expirado.</p>
+                <Button onClick={() => navigate('/login')} className="mt-4">Voltar</Button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-100 via-white to-sky-50">
+            <div className="w-full max-w-md bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
+                <h1 className="text-xl font-bold text-sky-900 mb-4 text-center">Criar Nova Senha</h1>
+                <Input label="Nova Senha" type="password" value={pass} onChange={e => setPass(e.target.value)} />
+                <Input label="Confirmar Nova Senha" type="password" value={confirm} onChange={e => setConfirm(e.target.value)} />
+                <Button fullWidth onClick={handleSubmit} className="mt-2">Salvar Senha</Button>
+                <button onClick={() => navigate('/login')} className="w-full text-center mt-4 text-sm text-gray-500 hover:text-primary">Cancelar</button>
+            </div>
+        </div>
+    );
 };
 
 // --- Settings Page ---
@@ -784,6 +840,11 @@ const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     
+    // Forgot Password Modal State
+    const [isForgotOpen, setForgotOpen] = useState(false);
+    const [forgotEmail, setForgotEmail] = useState('');
+    const [isSendingForgot, setIsSendingForgot] = useState(false);
+
     const [failedAttempts, setFailedAttempts] = useState(0);
     const [lockoutTime, setLockoutTime] = useState<number | null>(null);
 
@@ -846,6 +907,63 @@ const Login: React.FC = () => {
             alert(`Senha incorreta ou Usuário não encontrado. Tentativa ${newAttempts} de 3.`);
         }
     };
+    
+    const handleGoogleSuccess = (user: any) => {
+        if (state.bannedDocuments.includes(user.email)) {
+             alert("Acesso negado: Este e-mail foi banido.");
+             return;
+        }
+        dispatch({ type: 'LOGIN', payload: user });
+        navigate('/');
+    };
+
+    const handleGoogleNewUser = (googleData: any) => {
+        navigate('/register', { state: { googleData } });
+    };
+
+    const handleForgotPassword = async () => {
+        if (!forgotEmail) {
+            alert("Digite seu e-mail.");
+            return;
+        }
+
+        const userExists = state.users.find(u => u.email === forgotEmail);
+        if (!userExists) {
+            alert("E-mail não encontrado no sistema.");
+            return;
+        }
+
+        setIsSendingForgot(true);
+        const serviceID = 'service_dtvvjp8';
+        const templateID = 'template_8cthxoh';
+        const publicKey = 'NJZigwymrvB_gdLNP'; 
+        
+        // Link points to our app's reset page
+        const resetLink = `${window.location.href.split('#')[0]}#/reset-password?id=${userExists.id}`;
+
+        const templateParams = {
+            to_email: forgotEmail,
+            to_name: userExists.name,
+            subject: 'Recuperação de Senha',
+            message: `Você solicitou a recuperação de senha. 
+            
+            Clique no link abaixo para criar uma nova senha:
+            ${resetLink}`
+        };
+
+        try {
+            // @ts-ignore
+            await window.emailjs.send(serviceID, templateID, templateParams, publicKey);
+            alert(`E-mail enviado para ${forgotEmail}. Verifique sua caixa de entrada.`);
+            setForgotOpen(false);
+            setForgotEmail('');
+        } catch (error) {
+            console.error('FAILED...', error);
+            alert("Erro ao enviar e-mail. Tente novamente mais tarde.");
+        } finally {
+            setIsSendingForgot(false);
+        }
+    };
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-100 via-white to-sky-50 max-w-md mx-auto relative overflow-hidden">
@@ -874,11 +992,23 @@ const Login: React.FC = () => {
                   <div>
                     <label className="text-xs font-bold text-gray-500 ml-1 mb-1 block">Senha</label>
                     <input className="w-full bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary transition-all" placeholder="••••••" type="password" value={password} onChange={e => setPassword(e.target.value)} />
+                    <div className="text-right mt-1">
+                        <button onClick={() => setForgotOpen(true)} className="text-xs text-sky-600 font-semibold hover:underline">Esqueci minha senha</button>
+                    </div>
                   </div>
                   
                   <button onClick={handleLogin} className="w-full bg-primary text-white font-bold py-3.5 rounded-xl hover:bg-sky-600 transition shadow-lg shadow-sky-200 mt-2">
                     Entrar
                   </button>
+                  
+                  <div className="relative flex py-2 items-center">
+                        <div className="flex-grow border-t border-gray-200"></div>
+                        <span className="flex-shrink-0 mx-4 text-gray-400 text-xs font-bold uppercase">Ou acesse com</span>
+                        <div className="flex-grow border-t border-gray-200"></div>
+                  </div>
+                  
+                  {/* Google Login Button */}
+                  <GoogleLoginButton onSuccess={handleGoogleSuccess} onNewUser={handleGoogleNewUser} />
                   
                   <div className="mt-4 pt-4 border-t border-gray-200 text-center">
                        <p className="text-sm text-gray-600 mb-2">Não tem uma conta?</p>
@@ -894,6 +1024,17 @@ const Login: React.FC = () => {
                      <Shield size={12} /> Acesso Administrativo
                 </Link>
             </div>
+
+            {/* Forgot Password Modal */}
+            <Modal isOpen={isForgotOpen} onClose={() => setForgotOpen(false)} title="Recuperar Senha">
+                 <div className="space-y-4">
+                     <p className="text-sm text-gray-600">Digite seu e-mail cadastrado. Enviaremos um link para você criar uma nova senha.</p>
+                     <Input label="E-mail" type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="seu@email.com" />
+                     <Button fullWidth onClick={handleForgotPassword} disabled={isSendingForgot}>
+                         {isSendingForgot ? 'Enviando...' : 'Enviar Link de Recuperação'}
+                     </Button>
+                 </div>
+            </Modal>
         </div>
     );
 };
@@ -981,6 +1122,7 @@ export default function App() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/admin-login" element={<AdminLogin />} />
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </Suspense>
