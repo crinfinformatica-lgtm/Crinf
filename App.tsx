@@ -75,13 +75,8 @@ const reducer = (state: AppState, action: Action): AppState => {
     case 'SET_BANNED':
       newState = { ...state, bannedDocuments: action.payload };
       break;
-    // For ADD/UPDATE/DELETE actions, we now trigger Firebase saves, 
-    // but we can optimistically update state or wait for the listener to fire.
-    // For simplicity, we'll let the listener update the lists, but we handle side effects in the component.
     case 'ADD_VENDOR':
-      // Optimistic or Firebase Trigger
       saveVendorToFirebase(action.payload);
-      // State will update via listener
       break;
     case 'ADD_USER':
       saveUserToFirebase(action.payload);
@@ -156,7 +151,6 @@ const reducer = (state: AppState, action: Action): AppState => {
        }
        break;
     case 'ADD_SECURITY_LOG':
-       // Security logs typically go to a separate collection, simplified here
        newState = { ...state, securityLogs: [action.payload as any, ...state.securityLogs] };
        break;
     case 'CLEAR_SECURITY_LOGS':
@@ -201,7 +195,7 @@ const BottomNav = () => {
   const location = useLocation();
   const { state } = useAppContext();
   
-  if (['/register', '/login', '/admin', '/admin-login'].includes(location.pathname)) return null;
+  if (['/register', '/login', '/admin-login'].includes(location.pathname)) return null;
 
   const navClass = (path: string) => 
     `flex flex-col items-center p-2 text-xs font-medium transition-colors ${location.pathname === path ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`;
@@ -274,18 +268,15 @@ const SettingsPage: React.FC = () => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Load user data into edit modal
     useEffect(() => {
         if (state.currentUser && isEditProfileOpen) {
             setEditName(state.currentUser.name);
             setEditPhoto(state.currentUser.photoUrl || '');
             
-            // Try to parse existing address string back to fields
             const fullAddress = state.currentUser.address || '';
             const parts = fullAddress.split(',');
             if (parts.length >= 2) {
                 setEditStreet(parts[0].trim());
-                // Handle Number and Neighborhood
                 const rest = parts.slice(1).join(',');
                 const dashParts = rest.split('-');
                 if (dashParts.length >= 1) {
@@ -298,7 +289,6 @@ const SettingsPage: React.FC = () => {
                 setEditStreet(fullAddress);
             }
 
-            // Load Vendor specific data if available
             if (state.currentUser.type === UserEnum.VENDOR) {
                 const vendorData = state.vendors.find(v => v.id === state.currentUser?.id);
                 if (vendorData) {
@@ -443,24 +433,6 @@ const SettingsPage: React.FC = () => {
              </div>
 
              <div className="px-4 space-y-4">
-                {isAdminOrMaster && (
-                    <div 
-                        onClick={() => navigate('/admin')}
-                        className="bg-gradient-to-r from-sky-800 to-sky-600 p-5 rounded-2xl shadow-lg shadow-sky-200 text-white flex items-center justify-between cursor-pointer transform transition active:scale-95"
-                    >
-                        <div className="flex items-center gap-4">
-                            <div className="bg-white/20 p-3 rounded-full backdrop-blur-sm">
-                                <Shield size={24} className="text-white" />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-lg">Painel Administrativo</h3>
-                                <p className="text-sky-100 text-xs">Gerenciar usuários e sistema</p>
-                            </div>
-                        </div>
-                        <ChevronRight size={20} className="text-white/70" />
-                    </div>
-                )}
-                
                 {state.currentUser && (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                         <div 
@@ -509,10 +481,19 @@ const SettingsPage: React.FC = () => {
                     </div>
                 </div>
 
+                {/* --- ADMIN DASHBOARD EMBEDDED --- */}
+                {isAdminOrMaster && (
+                    <div className="mt-6">
+                        <Suspense fallback={<div className="p-4 text-center text-gray-400">Carregando painel...</div>}>
+                            <AdminDashboard />
+                        </Suspense>
+                    </div>
+                )}
+
                 {state.currentUser && (
                     <button 
                         onClick={handleLogout}
-                        className="w-full bg-white text-red-500 font-semibold p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center gap-2 hover:bg-red-50 transition-colors"
+                        className="w-full bg-white text-red-500 font-semibold p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center gap-2 hover:bg-red-50 transition-colors mt-6"
                     >
                         <LogOut size={20} />
                         Sair da Conta
@@ -597,7 +578,6 @@ const SettingsPage: React.FC = () => {
                  </div>
              </Modal>
 
-             {/* Image Cropper Overlay */}
              {imageToCrop && (
                  <ImageCropper 
                     imageSrc={imageToCrop}
@@ -617,7 +597,6 @@ const AdminLogin: React.FC = () => {
     const [password, setPassword] = useState('');
     const [lockedUntil, setLockedUntil] = useState<number | null>(null);
     
-    // Check security logs for brute force protection
     useEffect(() => {
         const checkSecurity = () => {
             if (!state.securityLogs) return;
@@ -626,7 +605,6 @@ const AdminLogin: React.FC = () => {
                 log.timestamp > Date.now() - 15 * 60 * 1000 // Last 15 min
             );
             if (recentFailures.length >= 5) {
-                // Determine remaining time
                 const lastFail = recentFailures[0].timestamp;
                 setLockedUntil(lastFail + 15 * 60 * 1000);
             }
@@ -637,18 +615,16 @@ const AdminLogin: React.FC = () => {
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // BRUTE FORCE CHECK
         if (lockedUntil) {
             if (Date.now() < lockedUntil) {
                 const remaining = Math.ceil((lockedUntil - Date.now()) / 60000);
                 alert(`Sistema Bloqueado por Segurança. Tente novamente em ${remaining} minutos.`);
                 return;
             } else {
-                setLockedUntil(null); // Reset
+                setLockedUntil(null);
             }
         }
 
-        // 1. Check DB first for Master User
         const dbMaster = state.users.find(u => u.email === 'crinf.informatica@gmail.com');
         
         let success = false;
@@ -660,7 +636,6 @@ const AdminLogin: React.FC = () => {
                 loggedUser = dbMaster;
             }
         } else if (email === 'crinf.informatica@gmail.com' && password === 'Crinf!2025#') {
-             // Fallback
              const masterUser: UserType = {
                 id: 'master_crinf',
                 name: 'Administrador Crinf',
@@ -675,7 +650,6 @@ const AdminLogin: React.FC = () => {
             success = true;
             loggedUser = masterUser;
         } else {
-            // Check other admins
             const foundUser = state.users.find(u => u.email === email && u.type === UserEnum.ADMIN);
             if (foundUser && foundUser.password === password) {
                 success = true;
@@ -689,7 +663,7 @@ const AdminLogin: React.FC = () => {
                 type: 'ADD_SECURITY_LOG', 
                 payload: { action: 'LOGIN_SUCCESS', details: `Acesso realizado por ${loggedUser.email}` } 
             });
-            navigate('/admin');
+            navigate('/settings'); // REDIRECT TO SETTINGS INSTEAD OF ADMIN
         } else {
             dispatch({ 
                 type: 'ADD_SECURITY_LOG', 
@@ -702,7 +676,7 @@ const AdminLogin: React.FC = () => {
     const handleSendForgotEmail = async () => {
         const serviceID = 'service_dtvvjp8';
         const templateID = 'template_8cthxoh';
-        const publicKey = 'NJZigwymrvB_gdLNP'; // YOUR_PUBLIC_KEY
+        const publicKey = 'NJZigwymrvB_gdLNP'; 
 
         const templateParams = {
             to_email: 'crinf.informatica@gmail.com',
@@ -872,31 +846,6 @@ const Login: React.FC = () => {
         }
     };
 
-    const handleSendForgotEmail = async () => {
-        const serviceID = 'service_dtvvjp8';
-        const templateID = 'template_8cthxoh';
-        const publicKey = 'NJZigwymrvB_gdLNP'; // YOUR_PUBLIC_KEY
-
-        const templateParams = {
-            to_email: email,
-            to_name: 'Usuário',
-            subject: 'Recuperação de Acesso',
-            message: `Solicitação de recuperação de acesso. 
-            
-            Se você solicitou a troca de senha, clique no link abaixo para acessar sua conta e realizar a alteração em Ajustes:
-            ${window.location.href.split('#')[0]}#/settings`
-        };
-
-        try {
-            // @ts-ignore
-            await window.emailjs.send(serviceID, templateID, templateParams, publicKey);
-            alert("Um link de recuperação foi enviado para o seu e-mail. Verifique sua caixa de entrada.");
-        } catch (error) {
-            console.error('FAILED...', error);
-            alert("Erro ao enviar e-mail. Verifique se o e-mail está correto.");
-        }
-    };
-
     return (
         <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-100 via-white to-sky-50 max-w-md mx-auto relative overflow-hidden">
             <div className="absolute top-[-100px] left-[-100px] w-64 h-64 bg-sky-200 rounded-full blur-3xl opacity-50"></div>
@@ -965,14 +914,10 @@ const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // --- FIREBASE SYNC: REPLACE LOCALSTORAGE WITH REALTIME LISTENERS ---
-  
-  // 1. Initialize Seed Data (If Empty)
   useEffect(() => {
      seedInitialData();
   }, []);
 
-  // 2. Listen for Users
   useEffect(() => {
       const unsubscribe = subscribeToUsers((users) => {
           dispatch({ type: 'SET_USERS', payload: users });
@@ -980,7 +925,6 @@ export default function App() {
       return () => unsubscribe();
   }, []);
 
-  // 3. Listen for Vendors
   useEffect(() => {
       const unsubscribe = subscribeToVendors((vendors) => {
           dispatch({ type: 'SET_VENDORS', payload: vendors });
@@ -988,7 +932,6 @@ export default function App() {
       return () => unsubscribe();
   }, []);
 
-  // 4. Listen for Banned List
   useEffect(() => {
       const unsubscribe = subscribeToBanned((list) => {
           dispatch({ type: 'SET_BANNED', payload: list });
@@ -996,7 +939,6 @@ export default function App() {
       return () => unsubscribe();
   }, []);
 
-  // Geolocation Init
   useEffect(() => {
     const initLocation = async () => {
         try {
@@ -1009,7 +951,6 @@ export default function App() {
     initLocation();
   }, []);
 
-  // Recalculate distances
   useEffect(() => {
     if (state.userLocation && state.vendors.length > 0) {
         let hasChanges = false;
@@ -1023,9 +964,6 @@ export default function App() {
             }
             return vendor;
         });
-        // We do NOT dispatch SET_VENDORS here to avoid infinite loops with Firebase listener
-        // In a real app, distance is a UI computed property, not stored in DB
-        // For this hybrid approach, we accept that distance sorting happens in the Home view
     }
   }, [state.userLocation, state.vendors.length]); 
 
@@ -1041,7 +979,6 @@ export default function App() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/admin-login" element={<AdminLogin />} />
                     <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/admin" element={<AdminDashboard />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </Suspense>
