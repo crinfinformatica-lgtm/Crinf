@@ -8,7 +8,8 @@ import {
   deleteDoc, 
   onSnapshot,
   query,
-  where
+  where,
+  updateDoc
 } from "firebase/firestore";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
@@ -40,7 +41,8 @@ export const uploadImageToFirebase = async (base64Data: string, path: string): P
     return url;
   } catch (error) {
     console.error("Erro upload imagem:", error);
-    return base64Data; // Fallback se falhar
+    // CRITICAL FIX: Throw error instead of returning base64 to prevent DB size limit errors
+    throw new Error("Falha ao processar o upload da imagem. Tente uma imagem menor."); 
   }
 };
 
@@ -126,6 +128,16 @@ export const subscribeToBanned = (callback: (list: string[]) => void) => {
 
 // --- ACTIONS ---
 
+export const updateUserPassword = async (userId: string, newPassword: string) => {
+  try {
+      const userRef = doc(db, "users", userId);
+      await updateDoc(userRef, { password: newPassword });
+  } catch (error) {
+      console.error("Erro ao atualizar senha direta:", error);
+      throw error;
+  }
+};
+
 export const saveUserToFirebase = async (user: User) => {
   try {
     // Se tiver foto em base64, sobe pro storage primeiro
@@ -137,7 +149,7 @@ export const saveUserToFirebase = async (user: User) => {
     await setDoc(doc(db, "users", user.id), cleanUser);
   } catch (e: any) {
     console.error("Erro salvando user:", e);
-    alert(`Erro ao salvar usuário: ${e.message || e}. Verifique as permissões do Firebase.`);
+    alert(`Erro ao salvar usuário: ${e.message || e}.`);
     throw e;
   }
 };

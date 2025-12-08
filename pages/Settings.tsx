@@ -5,6 +5,7 @@ import { User, Settings, Edit3, Upload, Heart, Share2, Bell, Moon, Lock, Chevron
 import { useAppContext } from '../App';
 import { Button, Input, Modal, ImageCropper, TwoFactorModal } from '../components/UI';
 import { UserType as UserEnum, CATEGORIES } from '../types';
+import { uploadImageToFirebase } from '../services/firebaseService';
 
 // Lazy load admin dashboard
 const AdminDashboard = React.lazy(() => import('./AdminDashboard').then(module => ({ default: module.AdminDashboard })));
@@ -25,6 +26,7 @@ export const SettingsPage: React.FC = () => {
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [editName, setEditName] = useState('');
     const [editPhoto, setEditPhoto] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
     
     // Donation State
     const [isDonationOpen, setDonationOpen] = useState(false);
@@ -120,7 +122,7 @@ export const SettingsPage: React.FC = () => {
             return;
         }
         
-        // If Admin or Master, require 2FA
+        // If Admin or Master, require 2FA confirmation via email
         if (isAdminOrMaster) {
             set2FAOpen(true);
         } else {
@@ -165,47 +167,68 @@ export const SettingsPage: React.FC = () => {
         setImageToCrop(null);
     };
 
-    const handleSaveProfile = () => {
+    const handleSaveProfile = async () => {
         if (!state.currentUser) return;
+        setIsSaving(true);
         
-        const fullAddress = `${editStreet}, ${editNumber} - ${editNeighborhood} - Campo Largo/PR`;
+        try {
+            let photoUrlToSave = editPhoto;
 
-        // 1. Update USER profile
-        const updatedUser: any = {
-            ...state.currentUser,
-            name: editName,
-            address: fullAddress,
-            photoUrl: editPhoto,
-        };
-
-        if (state.currentUser.type === UserEnum.VENDOR) {
-            updatedUser.phone = editPhone;
-            updatedUser.description = editDescription;
-            updatedUser.categories = [editCategory];
-        }
-        
-        dispatch({ type: 'UPDATE_USER', payload: updatedUser });
-
-        // 2. CRITICAL FIX: Also update VENDOR profile if user is a vendor
-        // This ensures the public listing (VendorCard) gets the new photo and details
-        if (state.currentUser.type === UserEnum.VENDOR) {
-            const existingVendor = state.vendors.find(v => v.id === state.currentUser?.id);
-            if (existingVendor) {
-                const updatedVendor = {
-                    ...existingVendor,
-                    name: editName,
-                    address: fullAddress,
-                    phone: editPhone,
-                    description: editDescription,
-                    categories: [editCategory],
-                    photoUrl: editPhoto || existingVendor.photoUrl // Update photo
-                };
-                dispatch({ type: 'UPDATE_VENDOR', payload: updatedVendor });
+            // CRITICAL FIX: Explicitly upload image first if it's new (Base64)
+            // This prevents "random photo" issues by ensuring we have a fixed Firebase URL
+            if (editPhoto && editPhoto.startsWith('data:')) {
+                const fileName = `profile_${Date.now()}.jpg`;
+                const path = state.currentUser.type === UserEnum.VENDOR 
+                    ? `vendors/${state.currentUser.id}/${fileName}`
+                    : `users/${state.currentUser.id}/${fileName}`;
+                
+                photoUrlToSave = await uploadImageToFirebase(editPhoto, path);
             }
-        }
 
-        alert("Perfil atualizado com sucesso!");
-        setIsEditProfileOpen(false);
+            const fullAddress = `${editStreet}, ${editNumber} - ${editNeighborhood} - Campo Largo/PR`;
+
+            // 1. Prepare User Payload
+            const updatedUser: any = {
+                ...state.currentUser,
+                name: editName,
+                address: fullAddress,
+                photoUrl: photoUrlToSave,
+            };
+
+            if (state.currentUser.type === UserEnum.VENDOR) {
+                updatedUser.phone = editPhone;
+                updatedUser.description = editDescription;
+                updatedUser.categories = [editCategory];
+            }
+            
+            // 2. Dispatch User Update
+            dispatch({ type: 'UPDATE_USER', payload: updatedUser });
+
+            // 3. Explicitly Sync Vendor Profile to Ensure Persistence in Public List
+            if (state.currentUser.type === UserEnum.VENDOR) {
+                const existingVendor = state.vendors.find(v => v.id === state.currentUser?.id);
+                if (existingVendor) {
+                    const updatedVendor = {
+                        ...existingVendor,
+                        name: editName,
+                        address: fullAddress,
+                        phone: editPhone,
+                        description: editDescription,
+                        categories: [editCategory],
+                        photoUrl: photoUrlToSave // Use the fixed URL
+                    };
+                    dispatch({ type: 'UPDATE_VENDOR', payload: updatedVendor });
+                }
+            }
+
+            alert("Perfil e foto atualizados com sucesso!");
+            setIsEditProfileOpen(false);
+        } catch (error: any) {
+            console.error("Failed to save profile:", error);
+            alert(`Erro ao salvar perfil: ${error.message}`);
+        } finally {
+            setIsSaving(false);
+        }
     };
     
     const handleCopyPix = () => {
@@ -415,7 +438,9 @@ export const SettingsPage: React.FC = () => {
                         </div>
                      </div>
                      
-                     <Button fullWidth onClick={handleSaveProfile}>Salvar Alterações</Button>
+                     <Button fullWidth onClick={handleSaveProfile} disabled={isSaving}>
+                         {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                     </Button>
                  </div>
              </Modal>
 
