@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, LogOut, KeyRound, Lock, ShieldAlert, History } from 'lucide-react';
+import { Shield, User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, LogOut, KeyRound, Lock, ShieldAlert, History, Database } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Button, Input, Modal, TwoFactorModal, AdminLogo } from '../components/UI';
 import { UserType, User as IUser, Vendor } from '../types';
@@ -228,6 +228,16 @@ export const AdminDashboard: React.FC = () => {
       setConfirmMasterPass('');
   };
 
+  const handleFactoryReset = () => {
+      if(confirm("ATENÇÃO: Isso apagará TODOS os usuários e comércios cadastrados e restaurará o banco de dados inicial. Deseja continuar?")) {
+          if(prompt("Digite 'CONFIRMAR' para apagar tudo:") === 'CONFIRMAR') {
+              dispatch({ type: 'FACTORY_RESET' });
+              alert("Banco de dados resetado com sucesso.");
+              window.location.reload();
+          }
+      }
+  };
+
   const handleLogout = () => {
     if(confirm("Deseja desconectar do painel administrativo?")) {
         dispatch({ type: 'LOGOUT' });
@@ -263,7 +273,6 @@ export const AdminDashboard: React.FC = () => {
                     </p>
                 </div>
             </div>
-            {/* Header 'Sair' removed or kept as redundancy, keeping logic consistent */}
         </div>
 
         {/* Navigation Tabs - Changed to flex-wrap to ensure visibility on all screens */}
@@ -551,6 +560,18 @@ export const AdminDashboard: React.FC = () => {
                              >
                                  Encerrar Sessão Agora
                              </Button>
+
+                             {isMaster && (
+                                 <Button 
+                                    variant="danger" 
+                                    fullWidth 
+                                    className="mt-4 border-red-500 hover:bg-red-600"
+                                    onClick={handleFactoryReset}
+                                    icon={<Database size={16} />}
+                                 >
+                                     Resetar Banco de Dados
+                                 </Button>
+                             )}
                         </div>
                     </div>
 

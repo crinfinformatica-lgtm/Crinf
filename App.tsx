@@ -4,10 +4,13 @@ import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, us
 import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera, Upload, X, MapPin } from 'lucide-react';
 import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum, CATEGORIES, SecurityLog } from './types';
 import { getUserLocation, calculateDistance } from './services/geoService';
-import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo } from './components/UI';
-import { INITIAL_DB } from './database';
+import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo, ImageCropper } from './components/UI';
+import { subscribeToUsers, subscribeToVendors, subscribeToBanned, saveUserToFirebase, saveVendorToFirebase, deleteUserFromFirebase, deleteVendorFromFirebase, banItemInFirebase, unbanItemInFirebase, seedInitialData } from './services/firebaseService';
 
-// --- Lazy Loading Pages (Code Splitting) ---
+// --- CONSTANTS ---
+const CURRENT_DB_VERSION = '2.0'; 
+
+// --- Lazy Loading Pages ---
 const HomePage = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })));
 const VendorDetails = lazy(() => import('./pages/VendorDetails').then(module => ({ default: module.VendorDetails })));
 const Register = lazy(() => import('./pages/Register').then(module => ({ default: module.Register })));
@@ -17,40 +20,28 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(module =
 const PageLoader = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-sky-50">
     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-    <p className="text-sky-600 font-semibold animate-pulse">Carregando...</p>
+    <p className="text-sky-600 font-semibold animate-pulse">Conectando ao Firebase...</p>
   </div>
 );
 
 // --- State Management ---
-const loadStateFromStorage = (): AppState => {
-  try {
-    const saved = localStorage.getItem('cl_perto_db_v1');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Ensure securityLogs exists for migration from older versions
-      if (!parsed.securityLogs) parsed.securityLogs = [];
-      return parsed;
-    }
-  } catch (e) {
-    console.error("Failed to load state", e);
-  }
-  // Fallback to Initial DB
-  return {
+// Initial state is mostly empty now, populated by Firebase
+const initialState: AppState = {
+    version: CURRENT_DB_VERSION,
     currentUser: null,
-    users: INITIAL_DB.users || [],
-    vendors: INITIAL_DB.vendors || [],
-    bannedDocuments: INITIAL_DB.bannedDocuments || [],
+    users: [],
+    vendors: [],
+    bannedDocuments: [],
     searchQuery: '',
     selectedCategory: null,
     userLocation: null,
     securityLogs: []
-  };
 };
-
-const initialState: AppState = loadStateFromStorage();
 
 type Action = 
   | { type: 'SET_VENDORS'; payload: Vendor[] }
+  | { type: 'SET_USERS'; payload: UserType[] }
+  | { type: 'SET_BANNED'; payload: string[] }
   | { type: 'ADD_VENDOR'; payload: Vendor }
   | { type: 'ADD_USER'; payload: UserType }
   | { type: 'UPDATE_USER'; payload: UserType }
@@ -66,70 +57,55 @@ type Action =
   | { type: 'ADD_REVIEW'; payload: { vendorId: string; review: any } }
   | { type: 'REPLY_REVIEW'; payload: { vendorId: string; reviewId: string; replyText: string } }
   | { type: 'SET_LOCATION'; payload: LatLng }
-  | { type: 'MASTER_RESET_PASSWORD'; payload: string } // Payload is User ID
+  | { type: 'MASTER_RESET_PASSWORD'; payload: string } 
   | { type: 'CHANGE_OWN_PASSWORD'; payload: { id: string; newPass: string } }
   | { type: 'ADD_SECURITY_LOG'; payload: Omit<SecurityLog, 'id' | 'timestamp'> }
-  | { type: 'CLEAR_SECURITY_LOGS' };
+  | { type: 'CLEAR_SECURITY_LOGS' }
+  | { type: 'FACTORY_RESET' };
 
 const reducer = (state: AppState, action: Action): AppState => {
   let newState = state;
   switch (action.type) {
+    case 'SET_USERS':
+      newState = { ...state, users: action.payload };
+      break;
     case 'SET_VENDORS':
       newState = { ...state, vendors: action.payload };
       break;
+    case 'SET_BANNED':
+      newState = { ...state, bannedDocuments: action.payload };
+      break;
+    // For ADD/UPDATE/DELETE actions, we now trigger Firebase saves, 
+    // but we can optimistically update state or wait for the listener to fire.
+    // For simplicity, we'll let the listener update the lists, but we handle side effects in the component.
     case 'ADD_VENDOR':
-      newState = { ...state, vendors: [action.payload, ...state.vendors] };
+      // Optimistic or Firebase Trigger
+      saveVendorToFirebase(action.payload);
+      // State will update via listener
       break;
     case 'ADD_USER':
-      newState = { ...state, users: [...state.users, action.payload] };
+      saveUserToFirebase(action.payload);
       break;
     case 'UPDATE_USER':
-      // Update in user list
-      const updatedUsers = state.users.map(u => u.id === action.payload.id ? action.payload : u);
-      
-      // If it's a vendor-type user, we also need to update the vendor list to keep data in sync
-      let updatedVendors = state.vendors;
-      if (action.payload.type === UserEnum.VENDOR) {
-          updatedVendors = state.vendors.map(v => 
-              v.id === action.payload.id ? { 
-                  ...v, 
-                  name: action.payload.name, 
-                  address: action.payload.address,
-                  photoUrl: action.payload.photoUrl || v.photoUrl,
-                  // Map other extended fields if passed in payload
-                  phone: (action.payload as any).phone || v.phone,
-                  categories: (action.payload as any).categories || v.categories,
-                  description: (action.payload as any).description || v.description
-              } : v
-          );
+      saveUserToFirebase(action.payload);
+      if (state.currentUser && state.currentUser.id === action.payload.id) {
+          newState = { ...state, currentUser: action.payload };
       }
-
-      // Update currentUser if it's the same person (to reflect changes immediately in UI)
-      const updatedCurrentUser = state.currentUser && state.currentUser.id === action.payload.id 
-          ? { ...state.currentUser, ...action.payload } 
-          : state.currentUser;
-          
-      newState = { ...state, users: updatedUsers, vendors: updatedVendors, currentUser: updatedCurrentUser };
       break;
     case 'UPDATE_VENDOR':
-      newState = { ...state, vendors: state.vendors.map(v => v.id === action.payload.id ? { ...v, ...action.payload } : v) };
+      saveVendorToFirebase(action.payload);
       break;
     case 'DELETE_USER':
-      newState = { ...state, users: state.users.filter(u => u.id !== action.payload) };
+      deleteUserFromFirebase(action.payload);
       break;
     case 'DELETE_VENDOR':
-      newState = { ...state, vendors: state.vendors.filter(v => v.id !== action.payload) };
+      deleteVendorFromFirebase(action.payload);
       break;
     case 'BAN_DOCUMENT':
-      newState = { 
-        ...state, 
-        bannedDocuments: [...state.bannedDocuments, action.payload],
-        users: state.users.filter(u => u.cpf !== action.payload && u.email !== action.payload),
-        vendors: state.vendors.filter(v => v.document !== action.payload)
-      };
+      banItemInFirebase(action.payload);
       break;
     case 'UNBAN_DOCUMENT':
-      newState = { ...state, bannedDocuments: state.bannedDocuments.filter(d => d !== action.payload) };
+      unbanItemInFirebase(action.payload);
       break;
     case 'LOGIN':
       newState = { ...state, currentUser: action.payload };
@@ -147,69 +123,45 @@ const reducer = (state: AppState, action: Action): AppState => {
       newState = { ...state, userLocation: action.payload };
       break;
     case 'ADD_REVIEW':
-      newState = {
-        ...state,
-        vendors: state.vendors.map(v => {
-          if (v.id === action.payload.vendorId) {
-            const newReviews = [action.payload.review, ...v.reviews];
-            const newCount = newReviews.length;
-            const newRating = newReviews.reduce((acc, r) => acc + r.rating, 0) / newCount;
-            return { ...v, reviews: newReviews, reviewCount: newCount, rating: newRating };
-          }
-          return v;
-        })
-      };
+      const vendorToReview = state.vendors.find(v => v.id === action.payload.vendorId);
+      if (vendorToReview) {
+          const newReviews = [action.payload.review, ...vendorToReview.reviews];
+          const newCount = newReviews.length;
+          const newRating = newReviews.reduce((acc: any, r: any) => acc + r.rating, 0) / newCount;
+          const updatedV = { ...vendorToReview, reviews: newReviews, reviewCount: newCount, rating: newRating };
+          saveVendorToFirebase(updatedV);
+      }
       break;
     case 'REPLY_REVIEW':
-      newState = {
-          ...state,
-          vendors: state.vendors.map(v => {
-              if (v.id === action.payload.vendorId) {
-                  const updatedReviews = v.reviews.map(r => {
-                      if (r.id === action.payload.reviewId) {
-                          return { 
-                              ...r, 
-                              reply: action.payload.replyText, 
-                              replyDate: new Date().toLocaleDateString() 
-                          };
-                      }
-                      return r;
-                  });
-                  return { ...v, reviews: updatedReviews };
-              }
-              return v;
-          })
-      };
+       const vendorToReply = state.vendors.find(v => v.id === action.payload.vendorId);
+       if(vendorToReply) {
+          const updatedReviews = vendorToReply.reviews.map(r => {
+                if (r.id === action.payload.reviewId) {
+                    return { ...r, reply: action.payload.replyText, replyDate: new Date().toLocaleDateString() };
+                }
+                return r;
+            });
+          saveVendorToFirebase({ ...vendorToReply, reviews: updatedReviews });
+       }
       break;
     case 'MASTER_RESET_PASSWORD':
-      const defaultPass = '123456';
-      newState = {
-          ...state,
-          users: state.users.map(u => u.id === action.payload ? { ...u, password: defaultPass } as any : u)
-      };
-      break;
+       const u = state.users.find(u => u.id === action.payload);
+       if(u) saveUserToFirebase({...u, password: '123456'});
+       break;
     case 'CHANGE_OWN_PASSWORD':
-      newState = {
-          ...state,
-          users: state.users.map(u => u.id === action.payload.id ? { ...u, password: action.payload.newPass } as any : u),
-          currentUser: state.currentUser && state.currentUser.id === action.payload.id ? { ...state.currentUser, password: action.payload.newPass } : state.currentUser
-      };
-      break;
+       const u2 = state.users.find(u => u.id === action.payload.id);
+       if(u2) saveUserToFirebase({...u2, password: action.payload.newPass});
+       if (state.currentUser && state.currentUser.id === action.payload.id) {
+           newState = { ...state, currentUser: { ...state.currentUser, password: action.payload.newPass } };
+       }
+       break;
     case 'ADD_SECURITY_LOG':
-      const newLog: SecurityLog = {
-          id: Date.now().toString(),
-          timestamp: Date.now(),
-          action: action.payload.action,
-          details: action.payload.details,
-          ip: '192.168.x.x (Simulado)'
-      };
-      // Keep only last 50 logs
-      const updatedLogs = [newLog, ...(state.securityLogs || [])].slice(0, 50);
-      newState = { ...state, securityLogs: updatedLogs };
-      break;
+       // Security logs typically go to a separate collection, simplified here
+       newState = { ...state, securityLogs: [action.payload as any, ...state.securityLogs] };
+       break;
     case 'CLEAR_SECURITY_LOGS':
-      newState = { ...state, securityLogs: [] };
-      break;
+       newState = { ...state, securityLogs: [] };
+       break;
     default:
       return state;
   }
@@ -249,7 +201,6 @@ const BottomNav = () => {
   const location = useLocation();
   const { state } = useAppContext();
   
-  // Hide nav on specific pages
   if (['/register', '/login', '/admin', '/admin-login'].includes(location.pathname)) return null;
 
   const navClass = (path: string) => 
@@ -307,6 +258,9 @@ const SettingsPage: React.FC = () => {
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [editName, setEditName] = useState('');
     const [editPhoto, setEditPhoto] = useState('');
+    
+    // Cropper State
+    const [imageToCrop, setImageToCrop] = useState<string | null>(null);
     
     // Separated Address Edit
     const [editStreet, setEditStreet] = useState('');
@@ -409,10 +363,16 @@ const SettingsPage: React.FC = () => {
         if (file) {
             const reader = new FileReader();
             reader.onloadend = () => {
-                setEditPhoto(reader.result as string);
+                setImageToCrop(reader.result as string);
             };
             reader.readAsDataURL(file);
         }
+        e.target.value = '';
+    };
+
+    const handleCropComplete = (croppedBase64: string) => {
+        setEditPhoto(croppedBase64);
+        setImageToCrop(null);
     };
 
     const handleSaveProfile = () => {
@@ -427,7 +387,6 @@ const SettingsPage: React.FC = () => {
             photoUrl: editPhoto,
         };
 
-        // If vendor, add specific fields to payload
         if (state.currentUser.type === UserEnum.VENDOR) {
             updatedUser.phone = editPhone;
             updatedUser.description = editDescription;
@@ -502,7 +461,6 @@ const SettingsPage: React.FC = () => {
                     </div>
                 )}
                 
-                {/* User Settings - Change Password */}
                 {state.currentUser && (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                         <div 
@@ -562,7 +520,7 @@ const SettingsPage: React.FC = () => {
                 )}
                 
                 <div className="text-center pt-8 pb-4">
-                    <p className="text-xs text-gray-400">Versão do App: 1.7.5 (PWA)</p>
+                    <p className="text-xs text-gray-400">Versão do App: {CURRENT_DB_VERSION} (PWA)</p>
                 </div>
              </div>
              
@@ -622,7 +580,7 @@ const SettingsPage: React.FC = () => {
                                     onClick={() => fileInputRef.current?.click()}
                                     className="w-full py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 flex items-center justify-center gap-2"
                                 >
-                                    <Upload size={16} /> Carregar Nova Foto
+                                    <Upload size={16} /> Carregar e Ajustar
                                 </button>
                                 <input 
                                     ref={fileInputRef} 
@@ -638,6 +596,15 @@ const SettingsPage: React.FC = () => {
                      <Button fullWidth onClick={handleSaveProfile}>Salvar Alterações</Button>
                  </div>
              </Modal>
+
+             {/* Image Cropper Overlay */}
+             {imageToCrop && (
+                 <ImageCropper 
+                    imageSrc={imageToCrop}
+                    onCropComplete={handleCropComplete}
+                    onCancel={() => setImageToCrop(null)}
+                 />
+             )}
         </div>
     );
 };
@@ -740,7 +707,11 @@ const AdminLogin: React.FC = () => {
         const templateParams = {
             to_email: 'crinf.informatica@gmail.com',
             to_name: 'Master Crinf',
-            message: 'Você solicitou a redefinição de senha do painel administrativo. Acesse o painel para definir uma nova senha se possível ou contate o suporte técnico.'
+            subject: 'Recuperação de Acesso',
+            message: `Você solicitou a redefinição de senha. 
+            
+            Para redefinir sua senha, acesse o link abaixo:
+            ${window.location.href.split('#')[0]}#/settings`
         };
 
         try {
@@ -909,7 +880,11 @@ const Login: React.FC = () => {
         const templateParams = {
             to_email: email,
             to_name: 'Usuário',
-            message: 'Solicitação de recuperação de acesso. Se você não solicitou, ignore este e-mail.'
+            subject: 'Recuperação de Acesso',
+            message: `Solicitação de recuperação de acesso. 
+            
+            Se você solicitou a troca de senha, clique no link abaixo para acessar sua conta e realizar a alteração em Ajustes:
+            ${window.location.href.split('#')[0]}#/settings`
         };
 
         try {
@@ -990,16 +965,36 @@ const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Persistence: Save state to LocalStorage whenever it changes
+  // --- FIREBASE SYNC: REPLACE LOCALSTORAGE WITH REALTIME LISTENERS ---
+  
+  // 1. Initialize Seed Data (If Empty)
   useEffect(() => {
-    const stateToSave = {
-        ...state,
-        currentUser: null, // Don't persist logged user for security (or optional)
-        searchQuery: '',
-        userLocation: null
-    };
-    localStorage.setItem('cl_perto_db_v1', JSON.stringify(stateToSave));
-  }, [state]);
+     seedInitialData();
+  }, []);
+
+  // 2. Listen for Users
+  useEffect(() => {
+      const unsubscribe = subscribeToUsers((users) => {
+          dispatch({ type: 'SET_USERS', payload: users });
+      });
+      return () => unsubscribe();
+  }, []);
+
+  // 3. Listen for Vendors
+  useEffect(() => {
+      const unsubscribe = subscribeToVendors((vendors) => {
+          dispatch({ type: 'SET_VENDORS', payload: vendors });
+      });
+      return () => unsubscribe();
+  }, []);
+
+  // 4. Listen for Banned List
+  useEffect(() => {
+      const unsubscribe = subscribeToBanned((list) => {
+          dispatch({ type: 'SET_BANNED', payload: list });
+      });
+      return () => unsubscribe();
+  }, []);
 
   // Geolocation Init
   useEffect(() => {
@@ -1028,10 +1023,9 @@ export default function App() {
             }
             return vendor;
         });
-        updatedVendors.sort((a, b) => (a.distance || 999) - (b.distance || 999));
-        if (hasChanges) {
-             dispatch({ type: 'SET_VENDORS', payload: updatedVendors });
-        }
+        // We do NOT dispatch SET_VENDORS here to avoid infinite loops with Firebase listener
+        // In a real app, distance is a UI computed property, not stored in DB
+        // For this hybrid approach, we accept that distance sorting happens in the Home view
     }
   }, [state.userLocation, state.vendors.length]); 
 

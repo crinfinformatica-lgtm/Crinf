@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Store, Upload, X, MapPin, Briefcase, ShoppingBag } from 'lucide-react';
-import { Button, Input } from '../components/UI';
+import { Button, Input, ImageCropper } from '../components/UI';
 import { useAppContext } from '../App';
 import { UserType, CATEGORIES } from '../types';
 
@@ -46,6 +46,7 @@ export const Register: React.FC = () => {
   
   // Photo State
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Social Link State
@@ -57,10 +58,17 @@ export const Register: React.FC = () => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
+        setImageToCrop(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
+    // Reset file input to allow same file selection again
+    e.target.value = '';
+  };
+
+  const handleCropComplete = (croppedBase64: string) => {
+      setPhotoPreview(croppedBase64);
+      setImageToCrop(null);
   };
 
   const triggerFileInput = () => {
@@ -70,9 +78,6 @@ export const Register: React.FC = () => {
   const removePhoto = (e: React.MouseEvent) => {
     e.stopPropagation();
     setPhotoPreview(null);
-    if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-    }
   };
 
   const handleRegister = (e: React.FormEvent) => {
@@ -467,7 +472,7 @@ export const Register: React.FC = () => {
                                 ) : (
                                     <>
                                         <Upload className="mx-auto text-gray-400 mb-2" />
-                                        <span className="text-sm text-gray-500 block">Clique para enviar foto</span>
+                                        <span className="text-sm text-gray-500 block">Clique para enviar e ajustar</span>
                                         <span className="text-xs text-gray-400 block mt-1">(JPG, PNG)</span>
                                     </>
                                 )}
@@ -497,7 +502,7 @@ export const Register: React.FC = () => {
                                 </>
                             ) : (
                                 <div className="flex items-center gap-2 text-gray-400">
-                                    <Upload size={20} /> <span className="text-sm">Enviar Foto</span>
+                                    <Upload size={20} /> <span className="text-sm">Enviar e Ajustar Foto</span>
                                 </div>
                             )}
                             <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handlePhotoChange}/>
@@ -511,6 +516,15 @@ export const Register: React.FC = () => {
             </form>
         </div>
       </div>
+
+      {/* Image Cropper Overlay */}
+      {imageToCrop && (
+          <ImageCropper 
+            imageSrc={imageToCrop}
+            onCropComplete={handleCropComplete}
+            onCancel={() => setImageToCrop(null)}
+          />
+      )}
     </div>
   );
 };

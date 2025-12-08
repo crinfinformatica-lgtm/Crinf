@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Star, MapPin, Phone, MessageCircle, X, ShieldCheck, Smartphone, Mail, Share2, Copy, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Star, MapPin, Phone, MessageCircle, X, ShieldCheck, Smartphone, Mail, Share2, Copy, Check, ZoomIn, Move, Save } from 'lucide-react';
 import { Vendor } from '../types';
 
 // --- Star Rating ---
@@ -110,6 +110,151 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
     </div>
   );
 };
+
+// --- Image Cropper ---
+interface ImageCropperProps {
+  imageSrc: string;
+  onCropComplete: (croppedBase64: string) => void;
+  onCancel: () => void;
+}
+
+export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComplete, onCancel }) => {
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  
+  const imgRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
+    setIsDragging(true);
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    setDragStart({ x: clientX - position.x, y: clientY - position.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDragging) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    setPosition({
+      x: clientX - dragStart.x,
+      y: clientY - dragStart.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleSave = () => {
+    if (!imgRef.current) return;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const size = 300; // Output size
+    canvas.width = size;
+    canvas.height = size;
+
+    if (ctx) {
+      // Clear background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size, size);
+
+      // Save context
+      ctx.save();
+      
+      // Move to center to apply scale
+      ctx.translate(size / 2, size / 2);
+      ctx.scale(scale, scale);
+      ctx.translate(-size / 2, -size / 2);
+
+      // Draw image with position offset
+      // We need to calculate how the CSS translate maps to canvas draw
+      // In CSS, image is centered then translated.
+      // The logic here simplifies: draw image at offset relative to center
+      const img = imgRef.current;
+      
+      // Helper to center image in canvas based on aspect ratio
+      const aspect = img.naturalWidth / img.naturalHeight;
+      let drawWidth = size;
+      let drawHeight = size;
+      
+      if (aspect > 1) {
+          drawWidth = size * aspect;
+      } else {
+          drawHeight = size / aspect;
+      }
+
+      const x = (size - drawWidth) / 2 + position.x / scale; // Adjust pos by scale
+      const y = (size - drawHeight) / 2 + position.y / scale;
+
+      ctx.drawImage(img, x, y, drawWidth, drawHeight);
+      
+      ctx.restore();
+      onCropComplete(canvas.toDataURL('image/jpeg', 0.9));
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/80 flex flex-col items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden animate-slide-up">
+        <div className="p-4 border-b flex justify-between items-center">
+            <h3 className="font-bold text-gray-800">Ajustar Imagem</h3>
+            <button onClick={onCancel}><X size={20} /></button>
+        </div>
+        
+        <div 
+          className="relative w-full h-80 bg-gray-100 overflow-hidden cursor-move touch-none flex items-center justify-center"
+          ref={containerRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onTouchStart={handleMouseDown}
+          onTouchMove={handleMouseMove}
+          onTouchEnd={handleMouseUp}
+        >
+           <img 
+             ref={imgRef}
+             src={imageSrc} 
+             alt="Crop" 
+             className="max-w-none select-none pointer-events-none"
+             style={{ 
+               transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+               height: '300px', // Base height to fit container
+               width: 'auto'
+             }}
+           />
+           {/* Overlay Guide */}
+           <div className="absolute inset-0 border-[30px] border-black/30 pointer-events-none rounded-full" style={{ borderRadius: '50%' }}></div>
+        </div>
+
+        <div className="p-4 bg-white">
+           <div className="flex items-center gap-4 mb-4">
+              <ZoomIn size={20} className="text-gray-400" />
+              <input 
+                type="range" 
+                min="1" 
+                max="3" 
+                step="0.1" 
+                value={scale} 
+                onChange={(e) => setScale(parseFloat(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              />
+           </div>
+           
+           <div className="flex gap-2">
+              <Button variant="outline" onClick={onCancel} fullWidth>Cancelar</Button>
+              <Button onClick={handleSave} fullWidth icon={<Save size={18} />}>Salvar Foto</Button>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 // --- Vendor Card ---
 export const VendorCard: React.FC<{ vendor: Vendor; onClick: () => void }> = ({ vendor, onClick }) => {
@@ -226,20 +371,40 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
   const [code, setCode] = useState('');
   const [sentCode, setSentCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
-  // Simulate sending code when modal opens
+  // EmailJS Constants
+  const serviceID = 'service_dtvvjp8';
+  const templateID = 'template_8cthxoh';
+  const publicKey = 'NJZigwymrvB_gdLNP';
+
+  // Send Code via EmailJS
   useEffect(() => {
-    if (isOpen) {
-      setSentCode(null); // Reset
-      setCode('');
+    if (isOpen && !sentCode && !isSending) {
+      setIsSending(true);
       const generated = Math.floor(100000 + Math.random() * 900000).toString();
       
-      // Simulate network delay then "receive" message (Shortened for UX)
-      setTimeout(() => {
+      const emailParams = {
+        to_email: destination || 'crinf.informatica@gmail.com', // Fallback to master if no destination
+        to_name: 'Usuário',
+        subject: 'Código de Verificação de 2 Fatores',
+        message: `Seu código de verificação é: ${generated}`
+      };
+
+      // @ts-ignore
+      window.emailjs.send(serviceID, templateID, emailParams, publicKey)
+        .then(() => {
           setSentCode(generated);
-      }, 500);
+          setIsSending(false);
+        })
+        .catch((error: any) => {
+          console.error('FAILED...', error);
+          alert("Erro ao enviar código por e-mail. Verifique sua conexão.");
+          setIsSending(false);
+          onClose();
+        });
     }
-  }, [isOpen]);
+  }, [isOpen, destination, sentCode, isSending]);
 
   const handleVerify = () => {
     setIsLoading(true);
@@ -247,6 +412,8 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
       if (code === sentCode) {
         onSuccess();
         onClose();
+        setCode('');
+        setSentCode(null);
       } else {
         alert("Código incorreto. Tente novamente.");
       }
@@ -269,19 +436,18 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
             Para <strong>{actionTitle.toLowerCase()}</strong>, confirme sua identidade.
           </p>
 
-          {/* SIMULATION NOTIFICATION BOX */}
+          {/* NOTIFICATION BOX */}
           {sentCode ? (
              <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg animate-fade-in text-left">
                 <p className="text-xs font-bold text-green-800 uppercase mb-1 flex items-center gap-1">
-                    <Mail size={12} /> Código de Verificação
+                    <Mail size={12} /> Código Enviado!
                 </p>
                 <p className="text-xs text-green-700 mb-1">
-                  {destination ? `Enviado para: ${destination}` : 'Código enviado para o contato cadastrado.'}
+                  Verifique o e-mail: <strong>{destination || 'crinf.informatica@gmail.com'}</strong>
                 </p>
-                <div className="text-sm text-green-900 bg-white/50 p-2 rounded border border-green-100 mt-2 font-mono">
-                    Código de Segurança: <br/>
-                    <span className="text-lg font-black tracking-widest">{sentCode}</span>
-                </div>
+                <p className="text-[10px] text-gray-400 mt-1 italic">
+                    (Verifique também a caixa de Spam)
+                </p>
              </div>
           ) : (
             <div className="mb-6 py-4 flex flex-col items-center justify-center text-gray-400">
@@ -301,7 +467,7 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
                 placeholder="000000"
               />
             </div>
-            <p className="text-xs text-gray-400 mt-2">Digite o código de 6 dígitos acima.</p>
+            <p className="text-xs text-gray-400 mt-2">Digite o código de 6 dígitos enviado.</p>
           </div>
 
           <div className="flex gap-3">

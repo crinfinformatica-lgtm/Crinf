@@ -64,12 +64,13 @@ export interface Location {
 export interface SecurityLog {
   id: string;
   timestamp: number;
-  action: 'LOGIN_SUCCESS' | 'LOGIN_FAIL' | 'PASSWORD_CHANGE' | 'BAN_ACTION';
+  action: 'LOGIN_SUCCESS' | 'LOGIN_FAIL' | 'PASSWORD_CHANGE' | 'BAN_ACTION' | 'DB_RESET';
   details: string;
   ip?: string; // Simulated in frontend
 }
 
 export interface AppState {
+  version: string; // Control DB version for resets
   currentUser: User | Vendor | null;
   users: User[]; // Track all registered users
   vendors: Vendor[];
