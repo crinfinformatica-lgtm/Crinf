@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock } from 'lucide-react';
+import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock, Mail } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Button, Input, Modal, TwoFactorModal } from '../components/UI';
 import { UserType, User as IUser, Vendor } from '../types';
@@ -9,7 +9,7 @@ import { UserType, User as IUser, Vendor } from '../types';
 export const AdminDashboard: React.FC = () => {
   const { state, dispatch } = useAppContext();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'vendors' | 'banned' | 'distribute' | 'security'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'vendors' | 'blocked' | 'banned' | 'distribute' | 'security'>('users');
   
   // Session Timeout State
   const [lastActivity, setLastActivity] = useState(Date.now());
@@ -120,26 +120,44 @@ export const AdminDashboard: React.FC = () => {
               type: 'ADD_SECURITY_LOG', 
               payload: { action: 'UNLOCK_USER', details: `Usuário ${userId} desbloqueado pelo Admin.` } 
           });
+          alert("Usuário desbloqueado com sucesso.");
       }
   };
   
-  const handleResetPassword = (targetUser: IUser) => {
-      // Logic for secure reset
-      const isTargetPrivileged = targetUser.type === UserType.ADMIN || targetUser.type === UserType.MASTER;
+  const handleSendResetLink = async (targetUser: IUser) => {
+      if (!confirm(`Enviar link de redefinição de senha para ${targetUser.email}?`)) return;
 
-      const executeReset = () => {
-          if (confirm(`Zerar a senha do usuário ${targetUser.name} para '123456'?`)) {
-              dispatch({ type: 'MASTER_RESET_PASSWORD', payload: targetUser.id });
-              alert(`Senha de ${targetUser.name} foi redefinida para: 123456`);
-          }
+      const serviceID = 'service_dqxdi2a';
+      const templateID = 'template_8cthxoh';
+      const publicKey = 'NJZigwymrvB_gdLNP'; 
+      
+      // Construct the reset link
+      const resetLink = `${window.location.href.split('#')[0]}#/reset-password?id=${targetUser.id}`;
+
+      const templateParams = {
+          to_email: targetUser.email,
+          email: targetUser.email,
+          to_name: targetUser.name,
+          subject: 'Redefinição de Senha Solicitada pelo Admin',
+          message: `O administrador solicitou a redefinição da sua senha.
+          
+          Clique no link abaixo para criar uma nova senha:
+          ${resetLink}
+          
+          Se não foi você, contate o suporte.`
       };
 
-      if (isTargetPrivileged) {
-          setActionTitle("Resetar Senha de Admin/Master");
-          setPendingAction(() => executeReset);
-          set2FAOpen(true);
-      } else {
-          executeReset();
+      try {
+          // @ts-ignore
+          await window.emailjs.send(serviceID, templateID, templateParams, publicKey);
+          alert(`Link enviado com sucesso para ${targetUser.email}.`);
+          dispatch({ 
+            type: 'ADD_SECURITY_LOG', 
+            payload: { action: 'PASSWORD_CHANGE', details: `Admin enviou link de reset para ${targetUser.email}` } 
+          });
+      } catch (error) {
+          console.error("Erro email:", error);
+          alert("Erro ao enviar o e-mail. Verifique o console.");
       }
   };
 
@@ -264,6 +282,9 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const isMaster = state.currentUser?.type === UserType.MASTER;
+  
+  // Filter Locked Users
+  const lockedUsers = state.users.filter(u => u.lockedUntil && u.lockedUntil > Date.now());
 
   return (
     <div className="animate-fade-in mt-4 border-t border-gray-100 pt-6">
@@ -277,11 +298,12 @@ export const AdminDashboard: React.FC = () => {
           </div>
       </div>
 
-      {/* Navigation Tabs - Light Theme */}
+      {/* Navigation Tabs */}
       <div className="flex gap-2 flex-wrap pb-2 mb-4">
             {[
                 { id: 'users', icon: User, label: 'Usuários' },
                 { id: 'vendors', icon: Store, label: 'Comércios' },
+                { id: 'blocked', icon: Lock, label: 'Bloqueados' }, // New Tab
                 { id: 'banned', icon: Ban, label: 'Banidos' },
                 { id: 'security', icon: ShieldAlert, label: 'Segurança' },
                 { id: 'distribute', icon: Share2, label: 'Distribuição' }
@@ -333,11 +355,9 @@ export const AdminDashboard: React.FC = () => {
                             </div>
                             
                             <div className="flex gap-2 justify-end">
-                                {isLocked && (
-                                     <button onClick={() => handleUnlockUser(user.id)} className="p-1.5 bg-green-50 text-green-600 rounded hover:bg-green-100 border border-green-200" title="Desbloquear Acesso"><Unlock size={14} /></button>
-                                )}
                                 {isMaster && !isMasterUser && (
-                                    <button onClick={() => handleResetPassword(user)} className="p-1.5 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100" title="Zerar Senha"><KeyRound size={14} /></button>
+                                    // Key Icon now sends Link instead of hard reset
+                                    <button onClick={() => handleSendResetLink(user)} className="p-1.5 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100" title="Enviar Link de Senha"><Mail size={14} /></button>
                                 )}
                                 {canEdit && (
                                     <button onClick={() => openEditModal(user, 'user')} className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><Edit2 size={14} /></button>
@@ -353,6 +373,39 @@ export const AdminDashboard: React.FC = () => {
                     )})}
                 </div>
             </div>
+        )}
+
+        {/* LOCKED USERS TAB (NEW) */}
+        {activeTab === 'blocked' && (
+             <div className="space-y-4 animate-fade-in">
+                <h3 className="font-bold text-gray-700">Usuários Bloqueados (Senha Incorreta)</h3>
+                
+                {lockedUsers.length === 0 ? (
+                    <div className="text-center py-6 bg-white rounded-xl border border-dashed border-gray-300">
+                        <Check className="mx-auto text-green-500 mb-1" size={24} />
+                        <p className="text-xs text-gray-500">Nenhum usuário bloqueado no momento.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {lockedUsers.map(user => (
+                            <div key={user.id} className="bg-red-50 p-3 rounded-xl shadow-sm border border-red-200 flex justify-between items-center">
+                                <div>
+                                    <h4 className="font-bold text-red-800 text-sm">{user.name}</h4>
+                                    <p className="text-xs text-red-600">{user.email}</p>
+                                    <p className="text-[10px] text-gray-500 mt-1">Tentativas Falhas: {user.failedLoginAttempts}</p>
+                                </div>
+                                <Button 
+                                    onClick={() => handleUnlockUser(user.id)} 
+                                    className="py-1 px-3 text-xs h-auto bg-green-600 hover:bg-green-700 shadow-none"
+                                    icon={<Unlock size={14} />}
+                                >
+                                    Desbloquear
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+             </div>
         )}
 
         {/* VENDORS TAB */}
@@ -376,8 +429,8 @@ export const AdminDashboard: React.FC = () => {
                                 {isMaster && (
                                     <button onClick={() => {
                                         const linkedUser = state.users.find(u => u.id === vendor.id);
-                                        if (linkedUser) handleResetPassword(linkedUser);
-                                    }} className="p-1.5 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100"><KeyRound size={14} /></button>
+                                        if (linkedUser) handleSendResetLink(linkedUser);
+                                    }} className="p-1.5 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100" title="Enviar Link de Senha"><Mail size={14} /></button>
                                 )}
                                 <button onClick={() => openEditModal(vendor, 'vendor')} className="flex-1 py-1 bg-blue-50 text-blue-700 rounded text-[10px] font-bold hover:bg-blue-100 flex items-center justify-center gap-1"><Edit2 size={12} /> Editar</button>
                                 <button onClick={() => handleBan(vendor, 'vendor')} className="flex-1 py-1 bg-orange-50 text-orange-700 rounded text-[10px] font-bold hover:bg-orange-100 flex items-center justify-center gap-1"><Ban size={12} /> Banir</button>

@@ -437,13 +437,18 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
 
   useEffect(() => {
     if (isOpen && !sentCode && !isSending) {
+      if (!destination) {
+          alert("Erro: E-mail de destino não encontrado para enviar o código.");
+          onClose();
+          return;
+      }
+      
       setIsSending(true);
       const generated = Math.floor(100000 + Math.random() * 900000).toString();
-      const dest = destination || 'crinf.informatica@gmail.com';
       
       const emailParams = {
-        to_email: dest, 
-        email: dest, // Add explicit email field for templates that use {{email}}
+        to_email: destination, 
+        email: destination, // Redundant param for compatibility
         to_name: 'Usuário',
         subject: 'Código de Verificação de 2 Fatores',
         message: `Seu código de verificação é: ${generated}`
@@ -457,7 +462,7 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
         })
         .catch((error: any) => {
           console.error('FAILED...', error);
-          alert("Erro ao enviar código por e-mail. Verifique sua conexão.");
+          alert("Erro ao enviar código por e-mail. Verifique se o serviço de e-mail está ativo.");
           setIsSending(false);
           onClose();
         });
@@ -500,7 +505,7 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
                     <Mail size={12} /> Código Enviado!
                 </p>
                 <p className="text-xs text-green-700 mb-1">
-                  Verifique o e-mail: <strong>{destination || 'crinf.informatica@gmail.com'}</strong>
+                  Verifique o e-mail: <strong>{destination}</strong>
                 </p>
                 <p className="text-[10px] text-gray-400 mt-1 italic">
                     (Verifique também a caixa de Spam)

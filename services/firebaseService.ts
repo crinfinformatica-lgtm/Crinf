@@ -42,7 +42,7 @@ export const uploadImageToFirebase = async (base64Data: string, path: string): P
   } catch (error) {
     console.error("Erro upload imagem:", error);
     // CRITICAL FIX: Throw error instead of returning base64 to prevent DB size limit errors
-    throw new Error("Falha ao processar o upload da imagem. Tente uma imagem menor."); 
+    throw new Error("Falha ao processar o upload da imagem. Verifique sua conexão."); 
   }
 };
 
@@ -59,7 +59,6 @@ export const signInWithGoogle = async (): Promise<{ user: User | null, isNewUser
 
         // Verificar se usuário já existe no Firestore (users collection)
         // Precisamos verificar tanto pelo ID quanto pesquisar pelo e-mail
-        // Como o ID no nosso sistema pode ser diferente do UID do Auth, buscamos pelo e-mail
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("email", "==", email));
         const querySnapshot = await getDocs(q);
@@ -185,6 +184,18 @@ export const updateUserPassword = async (userId: string, newPassword: string) =>
   }
 };
 
+export const updateVendorPartial = async (vendorId: string, data: Partial<Vendor>) => {
+    try {
+        const vendorRef = doc(db, "vendors", vendorId);
+        const cleanData = sanitizePayload(data);
+        // Use setDoc with merge: true to ensure it creates/updates regardless of previous state
+        await setDoc(vendorRef, cleanData, { merge: true });
+    } catch (error) {
+        console.error("Erro ao atualizar vendor parcial:", error);
+        throw error;
+    }
+};
+
 export const saveUserToFirebase = async (user: User) => {
   try {
     // Se tiver foto em base64, sobe pro storage primeiro
@@ -196,8 +207,8 @@ export const saveUserToFirebase = async (user: User) => {
     await setDoc(doc(db, "users", user.id), cleanUser);
   } catch (e: any) {
     console.error("Erro salvando user:", e);
-    alert(`Erro ao salvar usuário: ${e.message || e}.`);
-    throw e;
+    // Suppress alert here if triggered by background dispatch
+    console.warn(`Erro ao salvar usuário: ${e.message || e}.`);
   }
 };
 

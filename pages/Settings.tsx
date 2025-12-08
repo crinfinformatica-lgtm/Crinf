@@ -5,7 +5,7 @@ import { User, Settings, Edit3, Upload, Heart, Share2, Bell, Moon, Lock, Chevron
 import { useAppContext } from '../App';
 import { Button, Input, Modal, ImageCropper, TwoFactorModal } from '../components/UI';
 import { UserType as UserEnum, CATEGORIES } from '../types';
-import { uploadImageToFirebase } from '../services/firebaseService';
+import { uploadImageToFirebase, updateVendorPartial } from '../services/firebaseService';
 
 // Lazy load admin dashboard
 const AdminDashboard = React.lazy(() => import('./AdminDashboard').then(module => ({ default: module.AdminDashboard })));
@@ -27,6 +27,7 @@ export const SettingsPage: React.FC = () => {
     const [editName, setEditName] = useState('');
     const [editPhoto, setEditPhoto] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [savingStatus, setSavingStatus] = useState(''); // Text feedback
     
     // Donation State
     const [isDonationOpen, setDonationOpen] = useState(false);
@@ -76,9 +77,10 @@ export const SettingsPage: React.FC = () => {
                     setEditPhone(vendorData.phone);
                     setEditDescription(vendorData.description);
                     setEditCategory(vendorData.categories[0] || '');
-                    // Ensure photo edit starts with current vendor photo if user photo is missing
-                    if (!state.currentUser.photoUrl && vendorData.photoUrl) {
-                        setEditPhoto(vendorData.photoUrl);
+                    
+                    // Priority: If vendor has a specific photo, use it. If not, fallback to user photo.
+                    if (vendorData.photoUrl) {
+                         setEditPhoto(vendorData.photoUrl);
                     }
                 }
             }
@@ -170,24 +172,26 @@ export const SettingsPage: React.FC = () => {
     const handleSaveProfile = async () => {
         if (!state.currentUser) return;
         setIsSaving(true);
+        setSavingStatus("Iniciando...");
         
         try {
             let photoUrlToSave = editPhoto;
 
-            // CRITICAL FIX: Explicitly upload image first if it's new (Base64)
-            // This prevents "random photo" issues by ensuring we have a fixed Firebase URL
+            // Upload image if it is base64 (new upload)
             if (editPhoto && editPhoto.startsWith('data:')) {
+                setSavingStatus("Enviando imagem...");
                 const fileName = `profile_${Date.now()}.jpg`;
-                const path = state.currentUser.type === UserEnum.VENDOR 
-                    ? `vendors/${state.currentUser.id}/${fileName}`
-                    : `users/${state.currentUser.id}/${fileName}`;
+                // Always store in a consistent path for the ID
+                const path = `users/${state.currentUser.id}/${fileName}`;
                 
+                // Wait for upload to get the fixed URL
                 photoUrlToSave = await uploadImageToFirebase(editPhoto, path);
             }
 
+            setSavingStatus("Atualizando dados...");
             const fullAddress = `${editStreet}, ${editNumber} - ${editNeighborhood} - Campo Largo/PR`;
 
-            // 1. Prepare User Payload
+            // 1. Update User Record (Login/Header)
             const updatedUser: any = {
                 ...state.currentUser,
                 name: editName,
@@ -201,28 +205,44 @@ export const SettingsPage: React.FC = () => {
                 updatedUser.categories = [editCategory];
             }
             
-            // 2. Dispatch User Update
+            // Dispatch User Update (Saves to users collection)
             dispatch({ type: 'UPDATE_USER', payload: updatedUser });
 
-            // 3. Explicitly Sync Vendor Profile to Ensure Persistence in Public List
+            // 2. Explicitly Update Vendor Record (Public List) using direct update
             if (state.currentUser.type === UserEnum.VENDOR) {
+                const vendorUpdates = {
+                    name: editName,
+                    address: fullAddress,
+                    phone: editPhone,
+                    description: editDescription,
+                    categories: [editCategory],
+                    photoUrl: photoUrlToSave // Ensure this is the static Storage URL
+                };
+
+                // Use direct update service to guarantee DB write without relying on full local state
+                // This uses setDoc(..., {merge: true}) so it creates if missing
+                await updateVendorPartial(state.currentUser.id, vendorUpdates);
+                
+                // Trigger local update for immediate UI feedback
                 const existingVendor = state.vendors.find(v => v.id === state.currentUser?.id);
                 if (existingVendor) {
-                    const updatedVendor = {
-                        ...existingVendor,
-                        name: editName,
-                        address: fullAddress,
-                        phone: editPhone,
-                        description: editDescription,
-                        categories: [editCategory],
-                        photoUrl: photoUrlToSave // Use the fixed URL
-                    };
-                    dispatch({ type: 'UPDATE_VENDOR', payload: updatedVendor });
+                    dispatch({ 
+                        type: 'UPDATE_VENDOR', 
+                        payload: { ...existingVendor, ...vendorUpdates } 
+                    });
+                } else {
+                     // In case vendor wasn't loaded locally yet, force a reload or optimistic add would be needed
+                     // But dispatch UPDATE_VENDOR handles saveToFirebase too, so redundant but safe
                 }
             }
 
-            alert("Perfil e foto atualizados com sucesso!");
-            setIsEditProfileOpen(false);
+            setSavingStatus("Concluído!");
+            setTimeout(() => {
+                alert("Perfil salvo com sucesso!");
+                setIsEditProfileOpen(false);
+                setSavingStatus("");
+            }, 500);
+
         } catch (error: any) {
             console.error("Failed to save profile:", error);
             alert(`Erro ao salvar perfil: ${error.message}`);
@@ -439,7 +459,7 @@ export const SettingsPage: React.FC = () => {
                      </div>
                      
                      <Button fullWidth onClick={handleSaveProfile} disabled={isSaving}>
-                         {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                         {isSaving ? savingStatus || 'Salvando...' : 'Salvar Alterações'}
                      </Button>
                  </div>
              </Modal>

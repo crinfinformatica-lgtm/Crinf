@@ -5,6 +5,7 @@ import { ArrowLeft, User, Store, Upload, X, MapPin, Briefcase, ShoppingBag } fro
 import { Button, Input, ImageCropper } from '../components/UI';
 import { useAppContext } from '../App';
 import { UserType, CATEGORIES } from '../types';
+import { uploadImageToFirebase } from '../services/firebaseService';
 
 export const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -55,6 +56,8 @@ export const Register: React.FC = () => {
   const [linkValue, setLinkValue] = useState('');
 
   const [isGoogleRegister, setIsGoogleRegister] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registerStatus, setRegisterStatus] = useState('');
 
   // Pre-fill data if coming from Google Login
   useEffect(() => {
@@ -100,7 +103,7 @@ export const Register: React.FC = () => {
     setPhotoPreview(null);
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validation
@@ -145,122 +148,195 @@ export const Register: React.FC = () => {
         return;
     }
 
-    if (activeTab === UserType.USER) {
-        // --- CHECK 2: Duplicate Users ---
-        // Although Firebase service handles this, checking locally in state for instant feedback is good UX
-        const isDuplicateEmail = state.users.some(u => u.email === email);
-        const isDuplicateCPF = state.users.some(u => u.cpf === userCPF);
-        
-        if (isDuplicateEmail && !isGoogleRegister) {
-            alert("Erro: Já existe um usuário cadastrado com este e-mail.");
-            return;
-        }
-        if (isDuplicateCPF) {
-            alert("Erro: Já existe um usuário cadastrado com este CPF.");
-            return;
-        }
+    setIsRegistering(true);
+    setRegisterStatus("Iniciando...");
 
-        const newUser = {
-            id: Date.now().toString(),
-            name,
-            email,
-            cpf: userCPF,
-            address: fullAddress,
-            type: UserType.USER,
-            photoUrl: photoPreview || undefined,
-            password: password
-        };
-        dispatch({ type: 'ADD_USER', payload: newUser });
-        dispatch({ type: 'LOGIN', payload: newUser });
-        alert("Cadastro realizado com sucesso!");
-        navigate('/');
-    } else {
-        // --- CHECK 3: Duplicate Vendors ---
-        const isDuplicateDoc = state.vendors.some(v => v.document === vendorDoc);
-        
-        if (isDuplicateDoc) {
-            alert("Erro: Já existe um comércio cadastrado com este CNPJ/CPF.");
-            return;
-        }
+    try {
+        const newId = Date.now().toString();
 
-        // Determine final category
-        const finalCategory = isCustomCategory ? customCategory : category;
-        if (!finalCategory) {
-            alert("Por favor, selecione ou digite uma categoria.");
-            return;
-        }
+        if (activeTab === UserType.USER) {
+            // --- CHECK 2: Duplicate Users ---
+            const isDuplicateEmail = state.users.some(u => u.email === email);
+            const isDuplicateCPF = state.users.some(u => u.cpf === userCPF);
+            
+            if (isDuplicateEmail && !isGoogleRegister) {
+                alert("Erro: Já existe um usuário cadastrado com este e-mail.");
+                setIsRegistering(false);
+                return;
+            }
+            if (isDuplicateCPF) {
+                alert("Erro: Já existe um usuário cadastrado com este CPF.");
+                setIsRegistering(false);
+                return;
+            }
 
-        // Format Link
-        let finalWebsite = '';
-        if (linkValue) {
-            if (linkValue.startsWith('http')) {
-                finalWebsite = linkValue;
-            } else {
-                switch (linkType) {
-                    case 'Instagram':
-                        finalWebsite = `https://instagram.com/${linkValue.replace(/^@/, '').replace(/.*\//, '')}`;
-                        break;
-                    case 'Facebook':
-                        finalWebsite = `https://facebook.com/${linkValue}`;
-                        break;
-                    case 'Site':
-                        finalWebsite = `https://${linkValue}`;
-                        break;
-                    default:
-                        finalWebsite = linkValue;
+            // Upload Photo if exists
+            let finalPhotoUrl = photoPreview;
+            if (photoPreview && photoPreview.startsWith('data:')) {
+                setRegisterStatus("Enviando foto...");
+                finalPhotoUrl = await uploadImageToFirebase(photoPreview, `users/${newId}/profile.jpg`);
+            }
+
+            const newUser = {
+                id: newId,
+                name,
+                email,
+                cpf: userCPF,
+                address: fullAddress,
+                type: UserType.USER,
+                photoUrl: finalPhotoUrl || undefined,
+                password: password
+            };
+            
+            setRegisterStatus("Salvando conta...");
+            dispatch({ type: 'ADD_USER', payload: newUser });
+            dispatch({ type: 'LOGIN', payload: newUser });
+            alert("Cadastro realizado com sucesso!");
+            navigate('/');
+        } else {
+            // --- CHECK 3: Duplicate Vendors ---
+            const isDuplicateDoc = state.vendors.some(v => v.document === vendorDoc);
+            
+            if (isDuplicateDoc) {
+                alert("Erro: Já existe um comércio cadastrado com este CNPJ/CPF.");
+                setIsRegistering(false);
+                return;
+            }
+
+            // Determine final category
+            const finalCategory = isCustomCategory ? customCategory : category;
+            if (!finalCategory) {
+                alert("Por favor, selecione ou digite uma categoria.");
+                setIsRegistering(false);
+                return;
+            }
+
+            // Format Link
+            let finalWebsite = '';
+            if (linkValue) {
+                if (linkValue.startsWith('http')) {
+                    finalWebsite = linkValue;
+                } else {
+                    switch (linkType) {
+                        case 'Instagram':
+                            finalWebsite = `https://instagram.com/${linkValue.replace(/^@/, '').replace(/.*\//, '')}`;
+                            break;
+                        case 'Facebook':
+                            finalWebsite = `https://facebook.com/${linkValue}`;
+                            break;
+                        case 'Site':
+                            finalWebsite = `https://${linkValue}`;
+                            break;
+                        default:
+                            finalWebsite = linkValue;
+                    }
                 }
             }
-        }
-        
-        // Use a fixed seed for random photo if none uploaded to avoid "dancing" images on refresh
-        // Fix: Ensure date stamp is string for seed consistency
-        const seed = Date.now().toString();
-        const fallbackPhoto = `https://picsum.photos/seed/${seed}/400/300`;
-
-        const newVendor = {
-            id: Date.now().toString(),
-            name,
-            document: vendorDoc,
-            phone,
-            address: fullAddress,
-            categories: [finalCategory],
-            description,
-            website: finalWebsite, 
-            photoUrl: photoPreview || fallbackPhoto,
-            rating: 0,
-            reviewCount: 0,
-            reviews: [],
-            distance: 0.5,
-            visibility: {
-                showPhone,
-                showAddress,
-                showWebsite
+            
+            // Upload Photo for Vendor
+            // Fallback to a seeded URL to avoid "random dancing images"
+            // Using ID ensures it stays the same for this user
+            let finalPhotoUrl = `https://picsum.photos/seed/${newId}/400/300`; 
+            
+            if (photoPreview && photoPreview.startsWith('data:')) {
+                try {
+                    setRegisterStatus("Enviando foto da loja...");
+                    finalPhotoUrl = await uploadImageToFirebase(photoPreview, `vendors/${newId}/cover.jpg`);
+                } catch(e) {
+                    console.error("Foto upload fail", e);
+                    alert("Aviso: Falha ao enviar a foto. Usando imagem padrão.");
+                }
             }
-        };
-        
-        // Add as vendor AND as a login user
-        dispatch({ type: 'ADD_VENDOR', payload: newVendor });
-        
-        // Create a user entry so they can login
-        const vendorUser = {
-            id: newVendor.id, 
-            name: newVendor.name, 
-            email, 
-            cpf: vendorDoc, 
-            address: newVendor.address, 
-            type: UserType.VENDOR,
-            password: password,
-            photoUrl: photoPreview || fallbackPhoto
-        };
-        
-        const isDuplicateEmailUser = state.users.some(u => u.email === email);
-        if(!isDuplicateEmailUser) {
-             dispatch({ type: 'ADD_USER', payload: vendorUser });
-        }
 
-        dispatch({ type: 'LOGIN', payload: vendorUser });
-        alert("Cadastro realizado com sucesso!");
-        navigate('/');
+            setRegisterStatus("Salvando perfil...");
+
+            const newVendor = {
+                id: newId,
+                name,
+                document: vendorDoc,
+                phone,
+                address: fullAddress,
+                categories: [finalCategory],
+                description,
+                website: finalWebsite, 
+                photoUrl: finalPhotoUrl,
+                rating: 0,
+                reviewCount: 0,
+                reviews: [],
+                distance: 0.5,
+                visibility: {
+                    showPhone,
+                    showAddress,
+                    showWebsite
+                }
+            };
+            
+            // Add as vendor AND as a login user
+            dispatch({ type: 'ADD_VENDOR', payload: newVendor });
+            
+            // Create a user entry so they can login
+            const vendorUser = {
+                id: newVendor.id, 
+                name: newVendor.name, 
+                email, 
+                cpf: vendorDoc, 
+                address: newVendor.address, 
+                type: UserType.VENDOR,
+                password: password,
+                photoUrl: finalPhotoUrl
+            };
+            
+            const isDuplicateEmailUser = state.users.some(u => u.email === email);
+            if(!isDuplicateEmailUser) {
+                dispatch({ type: 'ADD_USER', payload: vendorUser });
+            }
+
+            // --- NOTIFY ADMIN VIA EMAIL ---
+            const sendAdminNotification = () => {
+                const serviceID = 'service_dqxdi2a';
+                const templateID = 'template_8cthxoh';
+                const publicKey = 'NJZigwymrvB_gdLNP';
+
+                const messageBody = `Novo cadastro de Comércio/Serviço:
+                
+                Nome: ${newVendor.name}
+                Documento: ${newVendor.document}
+                Categoria: ${newVendor.categories[0]}
+                Email: ${email}
+                Telefone: ${newVendor.phone}
+                Endereço: ${newVendor.address}
+                
+                Verifique no Painel Administrativo.`;
+
+                const templateParams = {
+                    to_email: 'crinf.informatica@gmail.com',
+                    email: 'crinf.informatica@gmail.com',
+                    to_name: 'Admin',
+                    subject: 'Novo Comércio Cadastrado - O Que Tem Perto?',
+                    message: messageBody
+                };
+
+                // @ts-ignore
+                if (window.emailjs) {
+                    // @ts-ignore
+                    window.emailjs.send(serviceID, templateID, templateParams, publicKey)
+                        .then(() => console.log("Notificação de cadastro enviada ao admin."))
+                        .catch((err: any) => console.error("Falha ao notificar admin", err));
+                }
+            };
+
+            sendAdminNotification();
+
+            dispatch({ type: 'LOGIN', payload: vendorUser });
+            alert("Cadastro realizado com sucesso!");
+            navigate('/');
+        }
+    } catch (error: any) {
+        console.error("Registration Error", error);
+        alert(`Erro no cadastro: ${error.message}`);
+    } finally {
+        setIsRegistering(false);
+        setRegisterStatus("");
     }
   };
 
@@ -551,8 +627,8 @@ export const Register: React.FC = () => {
                      </div>
                 )}
 
-                <Button fullWidth type="submit" className="mt-4 py-4 text-lg shadow-lg shadow-sky-200">
-                    {activeTab === UserType.VENDOR ? 'Finalizar Cadastro' : 'Criar Conta'}
+                <Button fullWidth type="submit" className="mt-4 py-4 text-lg shadow-lg shadow-sky-200" disabled={isRegistering}>
+                    {isRegistering ? registerStatus || 'Processando...' : (activeTab === UserType.VENDOR ? 'Finalizar Cadastro' : 'Criar Conta')}
                 </Button>
             </form>
         </div>
