@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'cl-perto-v5'; // Incremented version to force update
+const CACHE_NAME = 'cl-perto-v7'; // Incremented version to force update
 const urlsToCache = [
   './',
   './index.html',

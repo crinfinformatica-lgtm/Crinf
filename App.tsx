@@ -14,6 +14,7 @@ const CURRENT_DB_VERSION = '2.0';
 const HomePage = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })));
 const VendorDetails = lazy(() => import('./pages/VendorDetails').then(module => ({ default: module.VendorDetails })));
 const Register = lazy(() => import('./pages/Register').then(module => ({ default: module.Register })));
+// Admin Dashboard is now integrated into SettingsPage, but keeping lazy import if needed elsewhere or for routing safety
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
 
 // --- Loading Component ---
@@ -915,6 +916,7 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   useEffect(() => {
+     console.log("Inicializando Firebase...");
      seedInitialData();
   }, []);
 
