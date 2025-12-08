@@ -71,7 +71,7 @@ export interface SecurityLog {
 
 export interface AppState {
   version: string; // Control DB version for resets
-  currentUser: User | Vendor | null;
+  currentUser: User | null;
   users: User[]; // Track all registered users
   vendors: Vendor[];
   bannedDocuments: string[]; // Blacklist for CPF/CNPJ

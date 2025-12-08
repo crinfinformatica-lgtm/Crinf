@@ -785,7 +785,7 @@ const AdminLogin: React.FC = () => {
     };
 
     const handleSendForgotEmail = async () => {
-        const serviceID = 'service_dtvvjp8';
+        const serviceID = 'service_dqxdi2a';
         const templateID = 'template_8cthxoh';
         const publicKey = 'NJZigwymrvB_gdLNP'; 
 
@@ -997,7 +997,7 @@ const Login: React.FC = () => {
         }
 
         setIsSendingForgot(true);
-        const serviceID = 'service_dtvvjp8';
+        const serviceID = 'service_dqxdi2a';
         const templateID = 'template_8cthxoh';
         const publicKey = 'NJZigwymrvB_gdLNP'; 
         

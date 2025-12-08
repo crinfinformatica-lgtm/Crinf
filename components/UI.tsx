@@ -431,7 +431,7 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
   const [isSending, setIsSending] = useState(false);
 
   // EmailJS Constants
-  const serviceID = 'service_dtvvjp8';
+  const serviceID = 'service_dqxdi2a';
   const templateID = 'template_8cthxoh';
   const publicKey = 'NJZigwymrvB_gdLNP';
 
