@@ -59,6 +59,13 @@ export const Register: React.FC = () => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [registerStatus, setRegisterStatus] = useState('');
 
+  // Effect: If user is already logged in, force Vendor tab and hide User tab
+  useEffect(() => {
+      if (state.currentUser) {
+          setActiveTab(UserType.VENDOR);
+      }
+  }, [state.currentUser]);
+
   // Pre-fill data if coming from Google Login
   useEffect(() => {
       if (location.state && location.state.googleData) {
@@ -236,7 +243,7 @@ export const Register: React.FC = () => {
             // Upload Photo for Vendor
             // Fallback to a seeded URL to avoid "random dancing images"
             // Using ID ensures it stays the same for this user
-            let finalPhotoUrl = `https://picsum.photos/seed/${newId}/400/300`; 
+            let finalPhotoUrl = `https://placehold.co/400x300/e0f2fe/1e3a8a?text=Sem+Foto&font=roboto`; 
             
             if (photoPreview && photoPreview.startsWith('data:')) {
                 try {
@@ -246,6 +253,9 @@ export const Register: React.FC = () => {
                     console.error("Foto upload fail", e);
                     alert("Aviso: Falha ao enviar a foto. Usando imagem padrão.");
                 }
+            } else if (isGoogleRegister && photoPreview) {
+                 // If using Google Photo
+                 finalPhotoUrl = photoPreview;
             }
 
             setRegisterStatus("Salvando perfil...");
@@ -348,25 +358,41 @@ export const Register: React.FC = () => {
 
       <div className="max-w-md mx-auto">
         <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-sky-900">Crie sua conta</h1>
+            <h1 className="text-2xl font-bold text-sky-900">
+                {state.currentUser ? "Cadastrar Negócio" : "Crie sua conta"}
+            </h1>
             <p className="text-gray-500">Faça parte do O Que Tem Perto?</p>
         </div>
 
-        {/* Top Tabs */}
-        <div className="flex bg-white p-1 rounded-xl shadow-sm mb-6 border border-gray-100">
-            <button 
-                className={`flex-1 py-3 rounded-lg text-sm font-semibold flex items-center justify-center transition-all ${activeTab === UserType.USER ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
-                onClick={() => setActiveTab(UserType.USER)}
-            >
-                <User size={18} className="mr-2" /> Sou Cliente
-            </button>
-            <button 
-                className={`flex-1 py-3 rounded-lg text-sm font-semibold flex items-center justify-center transition-all ${activeTab === UserType.VENDOR ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
-                onClick={() => setActiveTab(UserType.VENDOR)}
-            >
-                <Store size={18} className="mr-2" /> Sou Negócio
-            </button>
-        </div>
+        {/* Top Tabs - Only show if user NOT logged in */}
+        {!state.currentUser && (
+            <div className="flex bg-white p-1 rounded-xl shadow-sm mb-6 border border-gray-100">
+                <button 
+                    className={`flex-1 py-3 rounded-lg text-sm font-semibold flex items-center justify-center transition-all ${activeTab === UserType.USER ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
+                    onClick={() => setActiveTab(UserType.USER)}
+                >
+                    <User size={18} className="mr-2" /> Sou Cliente
+                </button>
+                <button 
+                    className={`flex-1 py-3 rounded-lg text-sm font-semibold flex items-center justify-center transition-all ${activeTab === UserType.VENDOR ? 'bg-primary text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
+                    onClick={() => setActiveTab(UserType.VENDOR)}
+                >
+                    <Store size={18} className="mr-2" /> Sou Negócio
+                </button>
+            </div>
+        )}
+
+        {/* If user IS logged in, show info message */}
+        {state.currentUser && (
+            <div className="mb-6 bg-blue-50 border border-blue-100 p-4 rounded-xl text-center">
+                <p className="text-sm text-blue-800">
+                    Você já está logado como <strong>{state.currentUser.name}</strong>.
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                    Preencha os dados abaixo para registrar seu comércio ou serviço.
+                </p>
+            </div>
+        )}
 
         <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 space-y-4">
             
