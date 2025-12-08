@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Settings, Edit3, Upload, Heart, Share2, Bell, Moon, Lock, ChevronRight, Copy, Check, LogOut } from 'lucide-react';
 import { useAppContext } from '../App';
-import { Button, Input, Modal, ImageCropper } from '../components/UI';
+import { Button, Input, Modal, ImageCropper, TwoFactorModal } from '../components/UI';
 import { UserType as UserEnum, CATEGORIES } from '../types';
 
 // Lazy load admin dashboard
@@ -17,6 +17,9 @@ export const SettingsPage: React.FC = () => {
     const [isChangePassOpen, setChangePassOpen] = useState(false);
     const [newPass, setNewPass] = useState('');
     const [confirmPass, setConfirmPass] = useState('');
+
+    // 2FA State for Password Change
+    const [is2FAOpen, set2FAOpen] = useState(false);
 
     // Edit Profile State
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -42,6 +45,7 @@ export const SettingsPage: React.FC = () => {
     const [editCategory, setEditCategory] = useState('');
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const isAdminOrMaster = state.currentUser?.type === UserEnum.ADMIN || state.currentUser?.type === UserEnum.MASTER;
 
     useEffect(() => {
         if (state.currentUser && isEditProfileOpen) {
@@ -116,6 +120,17 @@ export const SettingsPage: React.FC = () => {
             return;
         }
         
+        // If Admin or Master, require 2FA
+        if (isAdminOrMaster) {
+            set2FAOpen(true);
+        } else {
+            executePasswordChange();
+        }
+    };
+
+    const executePasswordChange = () => {
+        if (!state.currentUser) return;
+
         dispatch({ 
             type: 'CHANGE_OWN_PASSWORD', 
             payload: { id: state.currentUser.id, newPass } 
@@ -198,8 +213,6 @@ export const SettingsPage: React.FC = () => {
         setIsPixCopied(true);
         setTimeout(() => setIsPixCopied(false), 2000);
     };
-
-    const isAdminOrMaster = state.currentUser?.type === UserEnum.ADMIN || state.currentUser?.type === UserEnum.MASTER;
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-sky-100 via-white to-sky-50 pb-24">
@@ -331,6 +344,11 @@ export const SettingsPage: React.FC = () => {
              <Modal isOpen={isChangePassOpen} onClose={() => setChangePassOpen(false)} title="Alterar Senha">
                  <div className="space-y-4">
                      <p className="text-sm text-gray-600 mb-2">Defina sua nova senha de acesso.</p>
+                     {isAdminOrMaster && (
+                         <div className="bg-yellow-50 text-yellow-800 p-2 rounded text-xs border border-yellow-200 mb-2">
+                             <strong>Segurança:</strong> Como Administrador, será exigido um código de confirmação enviado ao seu e-mail.
+                         </div>
+                     )}
                      <Input label="Nova Senha" type="password" value={newPass} onChange={e => setNewPass(e.target.value)} />
                      <Input label="Confirmar Senha" type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} />
                      <Button fullWidth onClick={handleChangePassword}>Salvar Nova Senha</Button>
@@ -432,6 +450,15 @@ export const SettingsPage: React.FC = () => {
                      </Button>
                  </div>
              </Modal>
+
+            {/* 2FA Modal for High Privilege Password Change */}
+            <TwoFactorModal 
+                isOpen={is2FAOpen} 
+                onClose={() => set2FAOpen(false)} 
+                onSuccess={executePasswordChange} 
+                actionTitle="Alterar Senha"
+                destination={state.currentUser?.email}
+            />
 
              {imageToCrop && (
                  <ImageCropper 

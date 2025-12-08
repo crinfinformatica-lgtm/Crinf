@@ -200,18 +200,27 @@ export const AdminDashboard: React.FC = () => {
           return;
       }
 
-      dispatch({ 
-          type: 'CHANGE_OWN_PASSWORD', 
-          payload: { id: state.currentUser.id, newPass: newMasterPass } 
-      });
-      dispatch({
-          type: 'ADD_SECURITY_LOG',
-          payload: { action: 'PASSWORD_CHANGE', details: 'O Master alterou sua própria senha.' }
-      });
-      alert("Senha Master atualizada com sucesso.");
-      setCurrentPass('');
-      setNewMasterPass('');
-      setConfirmMasterPass('');
+      // Wrap the action in a closure for the 2FA modal
+      const executeChange = () => {
+          if(!state.currentUser) return;
+          dispatch({ 
+              type: 'CHANGE_OWN_PASSWORD', 
+              payload: { id: state.currentUser.id, newPass: newMasterPass } 
+          });
+          dispatch({
+              type: 'ADD_SECURITY_LOG',
+              payload: { action: 'PASSWORD_CHANGE', details: 'O Master alterou sua própria senha.' }
+          });
+          alert("Senha Master atualizada com sucesso.");
+          setCurrentPass('');
+          setNewMasterPass('');
+          setConfirmMasterPass('');
+      };
+
+      // Trigger 2FA
+      setActionTitle("Alterar Senha Master");
+      setPendingAction(() => executeChange);
+      set2FAOpen(true);
   };
 
   const handleFactoryReset = () => {
