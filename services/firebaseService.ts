@@ -14,7 +14,7 @@ import {
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { db, storage, auth } from "../firebaseConfig";
-import { User, Vendor, UserType } from "../types";
+import { User, Vendor, UserType, AppConfig } from "../types";
 import { MASTER_USER, INITIAL_DB } from "../database";
 
 // --- HELPERS ---
@@ -205,6 +205,38 @@ export const subscribeToBanned = (callback: (list: string[]) => void) => {
     });
 };
 
+// --- APP CONFIGURATION (BRANDING) ---
+export const subscribeToAppConfig = (callback: (config: AppConfig | null) => void) => {
+    return onSnapshot(doc(db, "settings", "global"), (doc) => {
+        if (doc.exists()) {
+            callback(doc.data() as AppConfig);
+        } else {
+            callback(null);
+        }
+    }, (error) => {
+        console.error("Erro ao ler configuração do app:", error);
+    });
+};
+
+export const updateAppConfig = async (config: AppConfig) => {
+    try {
+        const settingsRef = doc(db, "settings", "global");
+        // Check if image is Base64 and needs upload
+        let finalLogoUrl = config.logoUrl;
+        
+        if (config.logoUrl && config.logoUrl.startsWith('data:')) {
+             finalLogoUrl = await uploadImageToFirebase(config.logoUrl, `settings/logo_${Date.now()}.png`);
+        }
+
+        const finalConfig = { ...config, logoUrl: finalLogoUrl };
+        await setDoc(settingsRef, sanitizePayload(finalConfig), { merge: true });
+        return finalConfig;
+    } catch (error) {
+        console.error("Erro ao salvar configuração:", error);
+        throw error;
+    }
+};
+
 // --- ACTIONS ---
 
 export const updateUserPassword = async (userId: string, newPassword: string) => {
@@ -310,28 +342,6 @@ export const seedInitialData = async () => {
             console.log("Seeding Master User to Firebase...");
             const cleanMaster = sanitizePayload(MASTER_USER);
             await setDoc(masterRef, cleanMaster);
-        }
-
-        const vendorsSnapshot = await getDocs(collection(db, "vendors"));
-        if (vendorsSnapshot.empty && INITIAL_DB.vendors) {
-            console.log("Seeding Demo Vendors to Firebase...");
-            for (const vendor of INITIAL_DB.vendors) {
-                const cleanVendor = sanitizePayload(vendor);
-                await setDoc(doc(db, "vendors", vendor.id), cleanVendor);
-                
-                const vendorUser: User = {
-                    id: vendor.id,
-                    name: vendor.name,
-                    email: `demo.${vendor.id}@email.com`, 
-                    cpf: vendor.document,
-                    address: vendor.address,
-                    type: UserType.VENDOR,
-                    password: "123",
-                    photoUrl: vendor.photoUrl
-                };
-                const cleanUser = sanitizePayload(vendorUser);
-                await setDoc(doc(db, "users", vendorUser.id), cleanUser);
-            }
         }
         localStorage.setItem('app_seeded_v8', 'true');
     } catch (error) {

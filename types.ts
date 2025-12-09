@@ -68,9 +68,18 @@ export interface Location {
 export interface SecurityLog {
   id: string;
   timestamp: number;
-  action: 'LOGIN_SUCCESS' | 'LOGIN_FAIL' | 'PASSWORD_CHANGE' | 'BAN_ACTION' | 'DB_RESET' | 'UNLOCK_USER';
+  action: 'LOGIN_SUCCESS' | 'LOGIN_FAIL' | 'PASSWORD_CHANGE' | 'BAN_ACTION' | 'DB_RESET' | 'UNLOCK_USER' | 'CONFIG_UPDATE';
   details: string;
   ip?: string; // Simulated in frontend
+}
+
+// Global App Configuration (Branding)
+export interface AppConfig {
+  appName: string;
+  logoUrl: string | null; // If null, use default SVG
+  logoWidth: number; // Pixel width for the logo
+  primaryColor: string; // Hex code
+  secondaryColor: string; // Hex code
 }
 
 export interface AppState {
@@ -84,6 +93,7 @@ export interface AppState {
   userLocation: Location | null;
   securityLogs: SecurityLog[]; // New field for security auditing
   darkMode: boolean; // Dark mode state
+  appConfig: AppConfig; // Dynamic branding
 }
 
 export const CATEGORIES = [

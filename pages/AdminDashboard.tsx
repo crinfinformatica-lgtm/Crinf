@@ -1,17 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock, Mail, Smartphone } from 'lucide-react';
+import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock, Mail, Smartphone, Palette, Upload, X, ZoomIn } from 'lucide-react';
 import { useAppContext } from '../App';
-import { Button, Input, Modal, TwoFactorModal } from '../components/UI';
-import { UserType, User as IUser, Vendor } from '../types';
-import { subscribeToUsers } from '../services/firebaseService';
+import { Button, Input, Modal, TwoFactorModal, PhotoSelector, ImageCropper, AppLogo } from '../components/UI';
+import { UserType, User as IUser, Vendor, AppConfig } from '../types';
+import { subscribeToUsers, updateAppConfig } from '../services/firebaseService';
 import { APP_CONFIG } from '../config';
 
 export const AdminDashboard: React.FC = () => {
   const { state, dispatch } = useAppContext();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'vendors' | 'blocked' | 'banned' | 'distribute' | 'security'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'vendors' | 'blocked' | 'banned' | 'distribute' | 'security' | 'customization'>('users');
   
   // Session Timeout State
   const [lastActivity, setLastActivity] = useState(Date.now());
@@ -40,6 +40,11 @@ export const AdminDashboard: React.FC = () => {
   const [newMasterPass, setNewMasterPass] = useState('');
   const [confirmMasterPass, setConfirmMasterPass] = useState('');
 
+  // Branding Customization State
+  const [tempConfig, setTempConfig] = useState<AppConfig>(state.appConfig);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+
   // Form State
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
@@ -59,6 +64,11 @@ export const AdminDashboard: React.FC = () => {
       });
       return () => unsubscribe();
   }, [dispatch]);
+
+  // Sync tempConfig when global config changes
+  useEffect(() => {
+      setTempConfig(state.appConfig);
+  }, [state.appConfig]);
 
   // Define on2FASuccess handler
   const on2FASuccess = () => {
@@ -353,6 +363,51 @@ export const AdminDashboard: React.FC = () => {
       }
   };
 
+  // Branding Handlers
+  const handleLogoUpload = (data: string) => {
+      if (data.startsWith('data:')) {
+          setImageToCrop(data);
+      } else {
+          setTempConfig({ ...tempConfig, logoUrl: data });
+      }
+  };
+
+  const handleLogoCrop = (cropped: string) => {
+      setTempConfig({ ...tempConfig, logoUrl: cropped });
+      setImageToCrop(null);
+  };
+
+  const handleSaveConfig = async () => {
+      setIsSavingConfig(true);
+      try {
+          const newConfig = await updateAppConfig(tempConfig);
+          dispatch({ type: 'SET_APP_CONFIG', payload: newConfig });
+          dispatch({
+              type: 'ADD_SECURITY_LOG',
+              payload: { action: 'CONFIG_UPDATE', details: 'Alteração de identidade visual do app.' }
+          });
+          alert("Configurações salvas com sucesso!");
+      } catch (error: any) {
+          alert("Erro ao salvar: " + error.message);
+      } finally {
+          setIsSavingConfig(false);
+      }
+  };
+
+  const handleResetConfig = () => {
+      if (confirm("Voltar para a identidade padrão?")) {
+          const defaultConfig = {
+              appName: "O QUE TEM PERTO?",
+              logoUrl: null,
+              logoWidth: 300,
+              primaryColor: "#0ea5e9",
+              secondaryColor: "#facc15"
+          };
+          setTempConfig(defaultConfig);
+          updateAppConfig(defaultConfig).then(c => dispatch({ type: 'SET_APP_CONFIG', payload: c }));
+      }
+  };
+
   const isMaster = state.currentUser?.type === UserType.MASTER;
   const lockedUsers = state.users.filter(u => u.lockedUntil && u.lockedUntil > Date.now());
 
@@ -376,6 +431,7 @@ export const AdminDashboard: React.FC = () => {
                 { id: 'blocked', icon: Lock, label: 'Bloqueados' },
                 { id: 'banned', icon: Ban, label: 'Banidos' },
                 { id: 'security', icon: ShieldAlert, label: 'Segurança' },
+                { id: 'customization', icon: Palette, label: 'Personalização' },
                 { id: 'distribute', icon: Share2, label: 'Distribuição' }
             ].map(tab => (
                 <button
@@ -518,6 +574,103 @@ export const AdminDashboard: React.FC = () => {
              </div>
         )}
 
+        {/* BRANDING CUSTOMIZATION TAB */}
+        {activeTab === 'customization' && (
+            <div className="space-y-6 animate-fade-in">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <h3 className="font-bold text-sm text-gray-800 mb-4 border-b pb-2">Identidade Visual</h3>
+                    
+                    {/* Preview Area */}
+                    <div className="mb-6 p-6 bg-gray-50 rounded-xl border border-gray-200 flex justify-center overflow-hidden relative">
+                         <div className="absolute top-2 left-2 text-[10px] text-gray-400 font-bold uppercase">Preview</div>
+                         <AppLogo customUrl={tempConfig.logoUrl} />
+                    </div>
+
+                    <div className="space-y-4">
+                        <Input 
+                            label="Nome do Aplicativo (Título)" 
+                            value={tempConfig.appName} 
+                            onChange={(e) => setTempConfig({...tempConfig, appName: e.target.value})} 
+                        />
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Cor Primária (Texto/Ícone)</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="color" 
+                                        value={tempConfig.primaryColor}
+                                        onChange={(e) => setTempConfig({...tempConfig, primaryColor: e.target.value})}
+                                        className="h-10 w-10 rounded cursor-pointer border-0"
+                                    />
+                                    <input 
+                                        type="text" 
+                                        value={tempConfig.primaryColor}
+                                        readOnly
+                                        className="flex-1 border rounded px-2 text-xs text-gray-600 bg-gray-50"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Cor Secundária (Destaque)</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="color" 
+                                        value={tempConfig.secondaryColor}
+                                        onChange={(e) => setTempConfig({...tempConfig, secondaryColor: e.target.value})}
+                                        className="h-10 w-10 rounded cursor-pointer border-0"
+                                    />
+                                    <input 
+                                        type="text" 
+                                        value={tempConfig.secondaryColor}
+                                        readOnly
+                                        className="flex-1 border rounded px-2 text-xs text-gray-600 bg-gray-50"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Tamanho da Logo ({tempConfig.logoWidth}px)</label>
+                            <input 
+                                type="range" 
+                                min="100" 
+                                max="500" 
+                                value={tempConfig.logoWidth} 
+                                onChange={(e) => setTempConfig({...tempConfig, logoWidth: parseInt(e.target.value)})}
+                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                            />
+                        </div>
+
+                        <div>
+                            <PhotoSelector 
+                                label="Upload de Nova Logo (Imagem)" 
+                                currentPhotoUrl={tempConfig.logoUrl}
+                                onPhotoSelected={handleLogoUpload}
+                            />
+                            {tempConfig.logoUrl && (
+                                <button 
+                                    onClick={() => setTempConfig({...tempConfig, logoUrl: null})}
+                                    className="text-xs text-red-500 hover:underline mt-1"
+                                >
+                                    Remover logo personalizada (Usar padrão)
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
+                            <Button fullWidth onClick={handleSaveConfig} disabled={isSavingConfig}>
+                                {isSavingConfig ? 'Salvando...' : 'Aplicar Alterações'}
+                            </Button>
+                            <Button variant="outline" onClick={handleResetConfig} disabled={isSavingConfig}>
+                                Restaurar Padrão
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* SECURITY TAB */}
         {activeTab === 'security' && (
             <div className="space-y-6 animate-fade-in">
@@ -641,6 +794,14 @@ export const AdminDashboard: React.FC = () => {
       </Modal>
 
       <TwoFactorModal isOpen={is2FAOpen} onClose={() => set2FAOpen(false)} onSuccess={on2FASuccess} actionTitle={actionTitle} destination={state.currentUser?.email} />
+
+      {imageToCrop && (
+          <ImageCropper 
+            imageSrc={imageToCrop}
+            onCropComplete={handleLogoCrop}
+            onCancel={() => setImageToCrop(null)}
+          />
+      )}
     </div>
   );
 };

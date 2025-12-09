@@ -2,10 +2,10 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, Suspense, lazy, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera, Upload, X, MapPin, Heart, Check, FileText } from 'lucide-react';
-import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum, CATEGORIES, SecurityLog } from './types';
+import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum, CATEGORIES, SecurityLog, AppConfig } from './types';
 import { getUserLocation, calculateDistance } from './services/geoService';
 import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo, ImageCropper, GoogleLoginButton } from './components/UI';
-import { subscribeToVendors, subscribeToBanned, saveUserToFirebase, saveVendorToFirebase, deleteUserFromFirebase, deleteVendorFromFirebase, banItemInFirebase, unbanItemInFirebase, seedInitialData, recordFailedLogin, successfulLogin, unlockUserAccount, getUserByEmail } from './services/firebaseService';
+import { subscribeToVendors, subscribeToBanned, subscribeToAppConfig, saveUserToFirebase, saveVendorToFirebase, deleteUserFromFirebase, deleteVendorFromFirebase, banItemInFirebase, unbanItemInFirebase, seedInitialData, recordFailedLogin, successfulLogin, unlockUserAccount, getUserByEmail } from './services/firebaseService';
 import { APP_CONFIG } from './config';
 
 // --- CONSTANTS ---
@@ -37,13 +37,21 @@ const initialState: AppState = {
     selectedCategory: null,
     userLocation: null,
     securityLogs: [],
-    darkMode: localStorage.getItem('theme') === 'dark'
+    darkMode: localStorage.getItem('theme') === 'dark',
+    appConfig: {
+        appName: "O QUE TEM PERTO?",
+        logoUrl: null, // Default
+        logoWidth: 300,
+        primaryColor: "#0ea5e9", // Sky 500
+        secondaryColor: "#facc15" // Yellow 400
+    }
 };
 
 type Action = 
   | { type: 'SET_VENDORS'; payload: Vendor[] }
   | { type: 'SET_USERS'; payload: UserType[] }
   | { type: 'SET_BANNED'; payload: string[] }
+  | { type: 'SET_APP_CONFIG'; payload: AppConfig }
   | { type: 'ADD_VENDOR'; payload: Vendor }
   | { type: 'ADD_USER'; payload: UserType }
   | { type: 'UPDATE_USER'; payload: UserType }
@@ -74,6 +82,9 @@ const reducer = (state: AppState, action: Action): AppState => {
       const newMode = !state.darkMode;
       localStorage.setItem('theme', newMode ? 'dark' : 'light');
       newState = { ...state, darkMode: newMode };
+      break;
+    case 'SET_APP_CONFIG':
+      newState = { ...state, appConfig: action.payload };
       break;
     case 'SET_USERS':
       newState = { ...state, users: action.payload };
@@ -723,6 +734,28 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [state.darkMode]);
+
+  // Load App Configuration on Start
+  useEffect(() => {
+      const unsubscribe = subscribeToAppConfig((config) => {
+          if (config) {
+              dispatch({ type: 'SET_APP_CONFIG', payload: config });
+          }
+      });
+      return () => unsubscribe();
+  }, []);
+
+  // Apply Dynamic CSS Variables for Colors
+  useEffect(() => {
+      const root = document.documentElement;
+      if (state.appConfig) {
+          root.style.setProperty('--app-primary', state.appConfig.primaryColor);
+          root.style.setProperty('--app-secondary', state.appConfig.secondaryColor);
+          
+          // Note: Full Tailwind override requires different config, 
+          // but we can use these vars in inline styles for specific elements
+      }
+  }, [state.appConfig]);
 
   useEffect(() => {
       const unsubscribe = subscribeToVendors((vendors) => {

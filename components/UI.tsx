@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Star, MapPin, Phone, MessageCircle, X, ShieldCheck, Smartphone, Mail, Share2, Copy, Check, ZoomIn, Move, Save, Upload, Link as LinkIcon, Image as ImageIcon, AlertCircle } from 'lucide-react';
-import { Vendor } from '../types';
+import { Vendor, AppConfig } from '../types';
 import { signInWithGoogle } from '../services/firebaseService';
+import { useAppContext } from '../App';
 
 // --- Star Rating ---
 export const StarRating: React.FC<{ rating: number; count?: number; size?: number }> = ({ rating, count, size = 16 }) => {
@@ -680,60 +681,94 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
   );
 };
 
-// --- NEW APP LOGO (Vertical: Text Top, Graphic Bottom) ---
-export const AppLogo = () => (
-  <svg viewBox="25 20 250 100" className="w-full max-w-[500px] h-auto drop-shadow-xl animate-fade-in mx-auto">
-    <defs>
-      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
-        <feOffset dx="1.5" dy="1.5" result="offsetblur"/>
-        <feComponentTransfer>
-          <feFuncA type="linear" slope="0.4"/>
-        </feComponentTransfer>
-        <feMerge> 
-          <feMergeNode/>
-          <feMergeNode in="SourceGraphic"/> 
-        </feMerge>
-      </filter>
-    </defs>
+// --- DYNAMIC APP LOGO ---
+interface AppLogoProps {
+    customUrl?: string | null; // Allow override for previews
+}
 
-    {/* TEXT ON TOP */}
-    <text x="150" y="45" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="26" fontWeight="900" fill="#0ea5e9" letterSpacing="0.5">O QUE TEM PERTO?</text>
+export const AppLogo: React.FC<AppLogoProps> = ({ customUrl }) => {
+    const { state } = useAppContext();
+    const config = state.appConfig;
+    
+    // Determine which image URL to use
+    // If customUrl prop is passed, use it (for preview)
+    // Else if config.logoUrl exists, use it
+    // Else null (use default SVG)
+    const logoImage = customUrl !== undefined ? customUrl : config.logoUrl;
 
-    {/* GRAPHIC GROUP - Centered Below Text */}
-    <g transform="translate(105, 55)">
-        {/* Connected Lines */}
-        <line x1="25" y1="30" x2="25" y2="70" stroke="#0c4a6e" strokeWidth="5" />
-        <line x1="25" y1="50" x2="65" y2="50" stroke="#0c4a6e" strokeWidth="5" />
+    if (logoImage) {
+        return (
+            <div className="flex flex-col items-center animate-fade-in mx-auto">
+                 <h1 className="text-2xl font-black text-center mb-2 drop-shadow-sm" style={{ color: config.primaryColor, fontFamily: 'Arial Black, sans-serif' }}>
+                     {config.appName}
+                 </h1>
+                 <img 
+                    src={logoImage} 
+                    alt="Logo" 
+                    className="object-contain drop-shadow-xl"
+                    style={{ maxWidth: `${config.logoWidth}px`, width: '100%', height: 'auto' }}
+                 />
+            </div>
+        );
+    }
 
-        {/* Circle 1: Shop (Yellow) - Top Left */}
-        <g transform="translate(25, 30)">
-            <circle r="19" fill="white" stroke="#facc15" strokeWidth="3" filter="url(#shadow)"/>
-            <g transform="translate(-10, -10) scale(0.8)">
-                <path d="M2 9a3 3 0 0 1 0-6h20a3 3 0 0 1 0 6v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9Z" fill="#facc15"/>
-                <path d="M1 5h22v4H1z" fill="#ca8a04"/>
+    // Default SVG Fallback with Dynamic Colors
+    return (
+        <svg viewBox="25 20 250 100" className="w-full h-auto drop-shadow-xl animate-fade-in mx-auto" style={{ maxWidth: `${config.logoWidth}px` }}>
+            <defs>
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
+                <feOffset dx="1.5" dy="1.5" result="offsetblur"/>
+                <feComponentTransfer>
+                <feFuncA type="linear" slope="0.4"/>
+                </feComponentTransfer>
+                <feMerge> 
+                <feMergeNode/>
+                <feMergeNode in="SourceGraphic"/> 
+                </feMerge>
+            </filter>
+            </defs>
+
+            {/* TEXT ON TOP - DYNAMIC APP NAME */}
+            <text x="150" y="45" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="26" fontWeight="900" fill={config.primaryColor} letterSpacing="0.5">
+                {config.appName}
+            </text>
+
+            {/* GRAPHIC GROUP - Centered Below Text */}
+            <g transform="translate(105, 55)">
+                {/* Connected Lines */}
+                <line x1="25" y1="30" x2="25" y2="70" stroke="#0c4a6e" strokeWidth="5" />
+                <line x1="25" y1="50" x2="65" y2="50" stroke="#0c4a6e" strokeWidth="5" />
+
+                {/* Circle 1: Shop (Secondary Color) - Top Left */}
+                <g transform="translate(25, 30)">
+                    <circle r="19" fill="white" stroke={config.secondaryColor} strokeWidth="3" filter="url(#shadow)"/>
+                    <g transform="translate(-10, -10) scale(0.8)">
+                        <path d="M2 9a3 3 0 0 1 0-6h20a3 3 0 0 1 0 6v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9Z" fill={config.secondaryColor}/>
+                        <path d="M1 5h22v4H1z" fill={config.secondaryColor} fillOpacity="0.8"/>
+                    </g>
+                </g>
+
+                {/* Circle 2: Tools (Primary Color) - Bottom Left */}
+                <g transform="translate(25, 70)">
+                    <circle r="19" fill="white" stroke={config.primaryColor} strokeWidth="3" filter="url(#shadow)"/>
+                    <g transform="translate(-9, -9) scale(0.75)">
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" fill={config.primaryColor}/>
+                    </g>
+                </g>
+
+                {/* Circle 3: User (Dark Blue / Static) - Right */}
+                <g transform="translate(65, 50)">
+                    <circle r="19" fill="white" stroke="#0c4a6e" strokeWidth="3" filter="url(#shadow)"/>
+                    <g transform="translate(-9, -9) scale(0.75)">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="#0c4a6e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="12" cy="7" r="4" fill="#0c4a6e"/>
+                    </g>
+                </g>
             </g>
-        </g>
-
-        {/* Circle 2: Tools (Blue) - Bottom Left */}
-        <g transform="translate(25, 70)">
-            <circle r="19" fill="white" stroke="#0ea5e9" strokeWidth="3" filter="url(#shadow)"/>
-            <g transform="translate(-9, -9) scale(0.75)">
-                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" fill="#0ea5e9"/>
-            </g>
-        </g>
-
-        {/* Circle 3: User (Dark Blue) - Right */}
-        <g transform="translate(65, 50)">
-            <circle r="19" fill="white" stroke="#0c4a6e" strokeWidth="3" filter="url(#shadow)"/>
-            <g transform="translate(-9, -9) scale(0.75)">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="#0c4a6e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-                <circle cx="12" cy="7" r="4" fill="#0c4a6e"/>
-            </g>
-        </g>
-    </g>
-  </svg>
-);
+        </svg>
+    );
+};
 
 // --- NEW ADMIN LOGO (Aligned Style) ---
 export const AdminLogo = () => (
