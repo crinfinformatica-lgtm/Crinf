@@ -176,6 +176,12 @@ export const SettingsPage: React.FC = () => {
             alert("Por favor, selecione um bairro válido.");
             return;
         }
+        
+        // Block Google Photos Sharing Links (They break the app)
+        if (editPhoto && (editPhoto.includes('photos.app.goo.gl') || editPhoto.includes('drive.google.com'))) {
+            alert("Links de compartilhamento do Google Fotos/Drive não funcionam diretamente. \n\nPor favor, faça o download da imagem e use a opção 'Dispositivo / Upload'.");
+            return;
+        }
 
         setIsSaving(true);
         setSavingStatus("Iniciando...");
@@ -183,18 +189,21 @@ export const SettingsPage: React.FC = () => {
         try {
             let finalPhotoUrl = editPhoto;
 
-            // 1. Upload image if it is base64 (new upload)
+            // --- STEP 1: UPLOAD TO STORAGE ---
+            // We MUST upload first to get the URL. We cannot save Base64 to Firestore (Too big).
             if (editPhoto && editPhoto.startsWith('data:')) {
-                setSavingStatus("Enviando imagem...");
+                setSavingStatus("Enviando imagem para o servidor...");
                 const fileName = `profile_${Date.now()}.jpg`;
+                // Path depends on user type, but structure is generally safe
                 const path = `users/${state.currentUser.id}/${fileName}`;
                 
                 try {
+                    // UploadBytes -> GetDownloadURL
                     finalPhotoUrl = await uploadImageToFirebase(editPhoto, path);
-                } catch(e) {
+                } catch(e: any) {
                     console.error("Upload failed", e);
-                    alert("Aviso: Falha no envio da foto. O perfil será salvo com a imagem anterior ou padrão.");
-                    // Keep the photo as is if upload fails, or revert to current user photo
+                    alert("Aviso: Falha no envio da foto. " + e.message);
+                    // Revert to old photo to avoid saving broken data
                     finalPhotoUrl = state.currentUser.photoUrl || "https://placehold.co/400x300/e0f2fe/1e3a8a?text=Sem+Foto";
                 }
             }
@@ -204,15 +213,15 @@ export const SettingsPage: React.FC = () => {
                  finalPhotoUrl = state.currentUser.photoUrl || "https://placehold.co/400x300/e0f2fe/1e3a8a?text=Sem+Foto";
             }
 
-            setSavingStatus("Atualizando dados...");
+            setSavingStatus("Salvando dados...");
             const fullAddress = `${editStreet}, ${editNumber} - ${editNeighborhood} - Campo Largo/PR`;
 
-            // 2. Prepare User Object (Login/Header)
+            // --- STEP 2: PREPARE DATA ---
             const updatedUser: any = {
                 ...state.currentUser,
                 name: editName,
                 address: fullAddress,
-                photoUrl: finalPhotoUrl,
+                photoUrl: finalPhotoUrl, // Here we use the CLEAN URL, not Base64
             };
 
             if (state.currentUser.type === UserEnum.VENDOR) {
@@ -221,10 +230,12 @@ export const SettingsPage: React.FC = () => {
                 updatedUser.categories = [editCategory];
             }
             
-            // 3. Dispatch User Update (Saves to users collection)
+            // --- STEP 3: UPDATE FIRESTORE (USERS COLLECTION) ---
+            // This updates the Redux state AND the Database via the Reducer > Service
             dispatch({ type: 'UPDATE_USER', payload: updatedUser });
 
-            // 4. Explicitly Update Vendor Record (Public List) using direct DB call
+            // --- STEP 4: SYNC VENDORS COLLECTION ---
+            // If user is also a vendor, we must explicitly update the public vendor listing
             if (state.currentUser.type === UserEnum.VENDOR) {
                 const vendorUpdates = {
                     name: editName,
@@ -232,11 +243,12 @@ export const SettingsPage: React.FC = () => {
                     phone: editPhone,
                     description: editDescription,
                     categories: [editCategory],
-                    photoUrl: finalPhotoUrl
+                    photoUrl: finalPhotoUrl // Ensure Vendor card gets the new photo
                 };
 
                 await updateVendorPartial(state.currentUser.id, vendorUpdates);
                 
+                // Update local state for immediate UI reflection
                 const existingVendor = state.vendors.find(v => v.id === state.currentUser?.id);
                 if (existingVendor) {
                     const newVendorState = { ...existingVendor, ...vendorUpdates };

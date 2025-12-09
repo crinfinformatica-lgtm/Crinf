@@ -231,16 +231,16 @@ export const updateVendorPartial = async (vendorId: string, data: Partial<Vendor
 
 export const saveUserToFirebase = async (user: User) => {
   try {
-    // Se tiver foto em base64, sobe pro storage primeiro
+    // Check if image is still Base64 (Should be handled by UI, but double check)
     if (user.photoUrl && user.photoUrl.startsWith('data:')) {
         const url = await uploadImageToFirebase(user.photoUrl, `users/${user.id}/profile.jpg`);
         user.photoUrl = url;
     }
     const cleanUser = sanitizePayload(user);
-    await setDoc(doc(db, "users", user.id), cleanUser);
+    // Use merge: true to avoid overwriting existing data if object is partial
+    await setDoc(doc(db, "users", user.id), cleanUser, { merge: true });
   } catch (e: any) {
     console.error("Erro salvando user:", e);
-    // Suppress alert here if triggered by background dispatch
     console.warn(`Erro ao salvar usuário: ${e.message || e}.`);
   }
 };
@@ -252,7 +252,7 @@ export const saveVendorToFirebase = async (vendor: Vendor) => {
         vendor.photoUrl = url;
     }
     const cleanVendor = sanitizePayload(vendor);
-    await setDoc(doc(db, "vendors", vendor.id), cleanVendor);
+    await setDoc(doc(db, "vendors", vendor.id), cleanVendor, { merge: true });
   } catch (e: any) {
     console.error("Erro salvando vendor:", e);
     alert(`Erro ao salvar comércio: ${e.message || e}`);
