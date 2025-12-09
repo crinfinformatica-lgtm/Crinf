@@ -187,10 +187,7 @@ export const SettingsPage: React.FC = () => {
             if (editPhoto && editPhoto.startsWith('data:')) {
                 setSavingStatus("Enviando imagem...");
                 const fileName = `profile_${Date.now()}.jpg`;
-                // Use consistent path logic
                 const path = `users/${state.currentUser.id}/${fileName}`;
-                
-                // Wait for upload to get the fixed URL
                 finalPhotoUrl = await uploadImageToFirebase(editPhoto, path);
             }
 
@@ -222,15 +219,11 @@ export const SettingsPage: React.FC = () => {
                     phone: editPhone,
                     description: editDescription,
                     categories: [editCategory],
-                    photoUrl: finalPhotoUrl // CRITICAL: Force the new URL here
+                    photoUrl: finalPhotoUrl
                 };
 
-                console.log("Saving Vendor Data:", vendorUpdates);
-
-                // Use direct update service to guarantee DB write without relying on full local state
                 await updateVendorPartial(state.currentUser.id, vendorUpdates);
                 
-                // 5. Update Local State for Vendor List immediately so UI reflects change without refresh
                 const existingVendor = state.vendors.find(v => v.id === state.currentUser?.id);
                 if (existingVendor) {
                     const newVendorState = { ...existingVendor, ...vendorUpdates };
@@ -263,13 +256,13 @@ export const SettingsPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-sky-100 via-white to-sky-50 pb-24">
-             <div className="bg-white p-6 pb-8 shadow-sm rounded-b-[2rem] mb-6">
-                 <h1 className="text-2xl font-bold text-sky-900 mb-6">Ajustes</h1>
+        <div className="min-h-screen bg-gradient-to-br from-sky-100 via-white to-sky-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 pb-24">
+             <div className="bg-white dark:bg-slate-800 p-6 pb-8 shadow-sm rounded-b-[2rem] mb-6 transition-colors">
+                 <h1 className="text-2xl font-bold text-sky-900 dark:text-sky-400 mb-6">Ajustes</h1>
                  
                  {state.currentUser ? (
                      <div className="flex items-center gap-4">
-                         <div className="w-16 h-16 bg-sky-100 rounded-full flex items-center justify-center border-4 border-white shadow-md overflow-hidden relative group">
+                         <div className="w-16 h-16 bg-sky-100 dark:bg-slate-700 rounded-full flex items-center justify-center border-4 border-white dark:border-slate-600 shadow-md overflow-hidden relative group">
                              {state.currentUser.photoUrl ? (
                                  <img src={state.currentUser.photoUrl} alt="Perfil" className="w-full h-full object-cover" />
                              ) : (
@@ -279,9 +272,9 @@ export const SettingsPage: React.FC = () => {
                          <div className="flex-1">
                              <div className="flex justify-between items-start">
                                 <div>
-                                    <h2 className="text-lg font-bold text-gray-800">{state.currentUser.name}</h2>
-                                    <p className="text-sm text-gray-500">{state.currentUser.email}</p>
-                                    <span className="text-[10px] bg-sky-50 text-sky-600 px-2 py-0.5 rounded-full border border-sky-100 font-semibold uppercase mt-1 inline-block">
+                                    <h2 className="text-lg font-bold text-gray-800 dark:text-white">{state.currentUser.name}</h2>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">{state.currentUser.email}</p>
+                                    <span className="text-[10px] bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-300 px-2 py-0.5 rounded-full border border-sky-100 dark:border-sky-800 font-semibold uppercase mt-1 inline-block">
                                         {state.currentUser.type === UserEnum.MASTER ? 'Conta Master' : 
                                         state.currentUser.type === UserEnum.ADMIN ? 'Administrador' : 
                                         state.currentUser.type === UserEnum.VENDOR ? 'Conta Comercial' : 'Cliente'}
@@ -289,7 +282,7 @@ export const SettingsPage: React.FC = () => {
                                 </div>
                                 <button 
                                     onClick={() => setIsEditProfileOpen(true)}
-                                    className="p-2 text-sky-600 bg-sky-50 rounded-full hover:bg-sky-100 shadow-sm"
+                                    className="p-2 text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-slate-700 rounded-full hover:bg-sky-100 dark:hover:bg-slate-600 shadow-sm"
                                 >
                                     <Edit3 size={18} />
                                 </button>
@@ -298,7 +291,7 @@ export const SettingsPage: React.FC = () => {
                      </div>
                  ) : (
                      <div className="text-center py-4">
-                         <p className="text-gray-500 mb-4">Você não está logado.</p>
+                         <p className="text-gray-500 dark:text-gray-400 mb-4">Você não está logado.</p>
                          <Button onClick={() => navigate('/login')} fullWidth>Entrar na Conta</Button>
                      </div>
                  )}
@@ -306,25 +299,25 @@ export const SettingsPage: React.FC = () => {
 
              <div className="px-4 space-y-4">
                 {state.currentUser && (
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden transition-colors">
                         <div 
                             onClick={() => setChangePassOpen(true)}
-                            className="p-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+                            className="p-4 border-b border-gray-50 dark:border-slate-700 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700"
                         >
                             <div className="flex items-center gap-3">
                                 <Lock size={20} className="text-gray-400" />
-                                <span className="text-gray-700 font-medium">Alterar Senha</span>
+                                <span className="text-gray-700 dark:text-gray-200 font-medium">Alterar Senha</span>
                             </div>
                             <ChevronRight size={16} className="text-gray-300" />
                         </div>
                     </div>
                 )}
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="p-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50">
+                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden transition-colors">
+                    <div className="p-4 border-b border-gray-50 dark:border-slate-700 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700">
                         <div className="flex items-center gap-3">
                             <Bell size={20} className="text-gray-400" />
-                            <span className="text-gray-700 font-medium">Notificações</span>
+                            <span className="text-gray-700 dark:text-gray-200 font-medium">Notificações</span>
                         </div>
                         <div className="w-10 h-6 bg-green-500 rounded-full relative">
                             <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
@@ -333,32 +326,35 @@ export const SettingsPage: React.FC = () => {
                     
                     <div 
                         onClick={handleShareApp}
-                        className="p-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+                        className="p-4 border-b border-gray-50 dark:border-slate-700 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700"
                     >
                         <div className="flex items-center gap-3">
                             <Share2 size={20} className="text-gray-400" />
-                            <span className="text-gray-700 font-medium">Compartilhar App</span>
+                            <span className="text-gray-700 dark:text-gray-200 font-medium">Compartilhar App</span>
                         </div>
                         <ChevronRight size={16} className="text-gray-300" />
                     </div>
 
-                    <div className="p-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50">
+                    <div 
+                        onClick={() => dispatch({ type: 'TOGGLE_THEME' })}
+                        className="p-4 border-b border-gray-50 dark:border-slate-700 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700"
+                    >
                         <div className="flex items-center gap-3">
                             <Moon size={20} className="text-gray-400" />
-                            <span className="text-gray-700 font-medium">Modo Escuro</span>
+                            <span className="text-gray-700 dark:text-gray-200 font-medium">Modo Escuro</span>
                         </div>
-                        <div className="w-10 h-6 bg-gray-200 rounded-full relative">
-                            <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+                        <div className={`w-10 h-6 rounded-full relative transition-colors ${state.darkMode ? 'bg-sky-600' : 'bg-gray-200'}`}>
+                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${state.darkMode ? 'left-5' : 'left-1'}`}></div>
                         </div>
                     </div>
 
                     <div 
                         onClick={() => setDonationOpen(true)}
-                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-red-50 group transition-colors"
+                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20 group transition-colors"
                     >
                         <div className="flex items-center gap-3">
                             <Heart size={20} className="text-red-400 group-hover:fill-red-400 transition-all" />
-                            <span className="text-gray-700 font-medium group-hover:text-red-500">Apoie o Projeto</span>
+                            <span className="text-gray-700 dark:text-gray-200 font-medium group-hover:text-red-500">Apoie o Projeto</span>
                         </div>
                         <ChevronRight size={16} className="text-gray-300" />
                     </div>
@@ -376,7 +372,7 @@ export const SettingsPage: React.FC = () => {
                 {state.currentUser && (
                     <button 
                         onClick={handleLogout}
-                        className="w-full bg-white text-red-500 font-semibold p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center gap-2 hover:bg-red-50 transition-colors mt-6"
+                        className="w-full bg-white dark:bg-slate-800 text-red-500 font-semibold p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 flex items-center justify-center gap-2 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors mt-6"
                     >
                         <LogOut size={20} />
                         Sair da Conta
@@ -391,7 +387,7 @@ export const SettingsPage: React.FC = () => {
              {/* Change Password Modal */}
              <Modal isOpen={isChangePassOpen} onClose={() => setChangePassOpen(false)} title="Alterar Senha">
                  <div className="space-y-4">
-                     <p className="text-sm text-gray-600 mb-2">Defina sua nova senha de acesso.</p>
+                     <p className="text-sm text-gray-600">Defina sua nova senha de acesso.</p>
                      {isAdminOrMaster && (
                          <div className="bg-yellow-50 text-yellow-800 p-2 rounded text-xs border border-yellow-200 mb-2">
                              <strong>Segurança:</strong> Como Administrador, será exigido um código de confirmação enviado ao seu e-mail.

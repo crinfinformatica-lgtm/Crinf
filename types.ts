@@ -42,6 +42,7 @@ export interface Vendor {
   reviews: Review[];
   type?: UserType;
   visibility: VendorVisibility; // New privacy settings
+  subtype?: 'COMMERCE' | 'SERVICE';
 }
 
 export interface User {
@@ -56,6 +57,7 @@ export interface User {
   password?: string; // Added optional password field
   failedLoginAttempts?: number; // Track failed attempts
   lockedUntil?: number; // Timestamp for lockout end
+  subtype?: 'COMMERCE' | 'SERVICE';
 }
 
 export interface Location {
@@ -81,6 +83,7 @@ export interface AppState {
   selectedCategory: string | null;
   userLocation: Location | null;
   securityLogs: SecurityLog[]; // New field for security auditing
+  darkMode: boolean; // Dark mode state
 }
 
 export const CATEGORIES = [

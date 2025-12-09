@@ -20,9 +20,9 @@ const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy').then(module => 
 
 // --- Loading Component ---
 const PageLoader = () => (
-  <div className="min-h-screen flex flex-col items-center justify-center bg-sky-50">
+  <div className="min-h-screen flex flex-col items-center justify-center bg-sky-50 dark:bg-slate-900">
     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-    <p className="text-sky-600 font-semibold animate-pulse">Conectando ao Firebase...</p>
+    <p className="text-sky-600 dark:text-sky-400 font-semibold animate-pulse">Conectando ao Firebase...</p>
   </div>
 );
 
@@ -30,13 +30,14 @@ const PageLoader = () => (
 const initialState: AppState = {
     version: CURRENT_DB_VERSION,
     currentUser: null,
-    users: [], // Will now be empty for regular users, populated only for admin
+    users: [], 
     vendors: [],
     bannedDocuments: [],
     searchQuery: '',
     selectedCategory: null,
     userLocation: null,
-    securityLogs: []
+    securityLogs: [],
+    darkMode: localStorage.getItem('theme') === 'dark'
 };
 
 type Action = 
@@ -63,11 +64,17 @@ type Action =
   | { type: 'ADD_SECURITY_LOG'; payload: Omit<SecurityLog, 'id' | 'timestamp'> }
   | { type: 'CLEAR_SECURITY_LOGS' }
   | { type: 'UNLOCK_USER'; payload: string }
-  | { type: 'FACTORY_RESET' };
+  | { type: 'FACTORY_RESET' }
+  | { type: 'TOGGLE_THEME' };
 
 const reducer = (state: AppState, action: Action): AppState => {
   let newState = state;
   switch (action.type) {
+    case 'TOGGLE_THEME':
+      const newMode = !state.darkMode;
+      localStorage.setItem('theme', newMode ? 'dark' : 'light');
+      newState = { ...state, darkMode: newMode };
+      break;
     case 'SET_USERS':
       newState = { ...state, users: action.payload };
       break;
@@ -187,12 +194,12 @@ const Footer = () => {
             href="https://instagram.com/crinfinformatica" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 text-[11px] font-semibold transition-colors"
+            className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 text-[11px] font-semibold transition-colors"
           >
             <Instagram size={12} />
             @crinfinformatica
           </a>
-          <Link to="/privacy" className="inline-flex items-center gap-1 text-gray-400 hover:text-gray-600 text-[11px] font-medium transition-colors">
+          <Link to="/privacy" className="inline-flex items-center gap-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-[11px] font-medium transition-colors">
               <FileText size={12} /> Política de Privacidade
           </Link>
       </div>
@@ -208,10 +215,10 @@ const BottomNav = () => {
   if (['/register', '/login', '/admin-login', '/reset-password', '/privacy'].includes(location.pathname)) return null;
 
   const navClass = (path: string) => 
-    `flex flex-col items-center p-2 text-xs font-medium transition-colors ${location.pathname === path ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`;
+    `flex flex-col items-center p-2 text-xs font-medium transition-colors ${location.pathname === path ? 'text-primary' : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'}`;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-200 py-2 pb-safe px-6 flex justify-between items-center z-50 max-w-md mx-auto">
+    <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-gray-200 dark:border-slate-800 py-2 pb-safe px-6 flex justify-between items-center z-50 max-w-md mx-auto">
       <Link to="/" className={navClass('/')}>
         <HomeIcon size={24} className="mb-1" />
         Início
@@ -219,10 +226,10 @@ const BottomNav = () => {
       
       {!state.currentUser ? (
         <Link to="/register" className="flex flex-col items-center -mt-6">
-            <div className="bg-accent text-sky-900 p-3 rounded-full shadow-lg border-2 border-white hover:scale-105 transition-transform">
+            <div className="bg-accent text-sky-900 p-3 rounded-full shadow-lg border-2 border-white dark:border-slate-900 hover:scale-105 transition-transform">
                 <PlusCircle size={28} />
             </div>
-            <span className="text-xs font-medium text-gray-500 mt-1">Cadastrar</span>
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">Cadastrar</span>
         </Link>
       ) : (
         <Link to="/register" className={navClass('/register')}>
@@ -284,31 +291,28 @@ const ResetPasswordPage: React.FC = () => {
 
     if (!userId) {
         return (
-            <div className="min-h-screen flex items-center justify-center p-6 bg-sky-50">
-                <p className="text-gray-600">Link de redefinição inválido ou expirado.</p>
+            <div className="min-h-screen flex items-center justify-center p-6 bg-sky-50 dark:bg-slate-900">
+                <p className="text-gray-600 dark:text-gray-400">Link de redefinição inválido ou expirado.</p>
                 <Button onClick={() => navigate('/login')} className="mt-4">Voltar</Button>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-100 via-white to-sky-50">
-            <div className="w-full max-w-md bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
-                <h1 className="text-xl font-bold text-sky-900 mb-4 text-center">Criar Nova Senha</h1>
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-100 via-white to-sky-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+            <div className="w-full max-w-md bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700">
+                <h1 className="text-xl font-bold text-sky-900 dark:text-sky-400 mb-4 text-center">Criar Nova Senha</h1>
                 <Input label="Nova Senha" type="password" value={pass} onChange={e => setPass(e.target.value)} />
                 <Input label="Confirmar Nova Senha" type="password" value={confirm} onChange={e => setConfirm(e.target.value)} />
                 <Button fullWidth onClick={handleSubmit} className="mt-2">Salvar Senha</Button>
-                <button onClick={() => navigate('/login')} className="w-full text-center mt-4 text-sm text-gray-500 hover:text-primary">Cancelar</button>
+                <button onClick={() => navigate('/login')} className="w-full text-center mt-4 text-sm text-gray-500 hover:text-primary dark:text-gray-400">Cancelar</button>
             </div>
         </div>
     );
 };
 
 // --- Settings Page ---
-// Imported from separate file via lazy load, but referenced here for routing
-
 const SettingsPage = lazy(() => import('./pages/Settings').then(module => ({ default: module.SettingsPage })));
-
 
 // --- Dedicated Admin Login (Manual Only) ---
 const AdminLogin: React.FC = () => {
@@ -346,7 +350,6 @@ const AdminLogin: React.FC = () => {
             }
         }
 
-        // Use direct lookup for admin login too, don't rely on state
         let success = false;
         let loggedUser: UserType | null = null;
         
@@ -363,7 +366,6 @@ const AdminLogin: React.FC = () => {
                      loggedUser = foundUser;
                  }
             } else if (email === APP_CONFIG.EMAILJS.ADMIN_EMAIL && password === 'Crinf!2025#') {
-                // Fallback Master Login if DB is empty or corrupted
                  const masterUser: UserType = {
                     id: 'master_crinf',
                     name: 'Administrador Crinf',
@@ -402,7 +404,7 @@ const AdminLogin: React.FC = () => {
     const handleSendForgotEmail = async () => {
         const templateParams = {
             to_email: APP_CONFIG.EMAILJS.ADMIN_EMAIL,
-            email: APP_CONFIG.EMAILJS.ADMIN_EMAIL, // Redundant
+            email: APP_CONFIG.EMAILJS.ADMIN_EMAIL,
             to_name: 'Master Crinf',
             subject: 'Recuperação de Acesso',
             message: `Você solicitou a redefinição de senha. 
@@ -416,7 +418,6 @@ const AdminLogin: React.FC = () => {
             if (!window.emailjs) {
                 throw new Error("Biblioteca de email não carregada.");
             }
-
             // @ts-ignore
             await window.emailjs.send(APP_CONFIG.EMAILJS.SERVICE_ID, APP_CONFIG.EMAILJS.TEMPLATE_ID, templateParams, APP_CONFIG.EMAILJS.PUBLIC_KEY);
             alert("Um link de recuperação foi enviado para o seu e-mail administrativo. Verifique sua caixa de entrada.");
@@ -512,8 +513,6 @@ const Login: React.FC = () => {
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    
-    // Forgot Password Modal State
     const [isForgotOpen, setForgotOpen] = useState(false);
     const [forgotEmail, setForgotEmail] = useState('');
     const [isSendingForgot, setIsSendingForgot] = useState(false);
@@ -525,18 +524,15 @@ const Login: React.FC = () => {
             return;
         }
 
-        // SCALABILITY FIX: Do NOT search in state.users. Fetch from DB directly.
         try {
             const foundUser = await getUserByEmail(email) as any;
             
             if (foundUser) {
-                // Check for persistent ban
                 if (state.bannedDocuments.includes(foundUser.cpf) || state.bannedDocuments.includes(foundUser.email)) {
                     alert("Acesso negado: Esta conta foi banida permanentemente pelo administrador.");
                     return;
                 }
 
-                // Check for persistent lockout (DB based)
                 if (foundUser.lockedUntil && foundUser.lockedUntil > Date.now()) {
                     const remaining = Math.ceil((foundUser.lockedUntil - Date.now()) / 60000);
                     alert(`Conta bloqueada por excesso de tentativas. Tente novamente em ${remaining} minutos ou contate o suporte.`);
@@ -546,15 +542,13 @@ const Login: React.FC = () => {
                 const storedPass = foundUser.password || '123'; 
 
                 if (password === storedPass) {
-                    // Successful Login
-                    await successfulLogin(foundUser); // Reset lock counters
+                    await successfulLogin(foundUser); 
                     if (password === '123456') {
                         alert("Sua senha foi redefinida pelo administrador para '123456'. Recomendamos alterá-la em Ajustes.");
                     }
                     dispatch({ type: 'LOGIN', payload: foundUser });
                     navigate('/');
                 } else {
-                    // Failed Login
                     const attempts = await recordFailedLogin(foundUser);
                     if (attempts && attempts >= 3) {
                         alert("Muitas tentativas incorretas. Sua conta foi bloqueada por 5 minutos.");
@@ -563,7 +557,6 @@ const Login: React.FC = () => {
                     }
                 }
             } else {
-                // User not found
                 alert("Usuário não encontrado ou senha incorreta.");
             }
         } catch(err) {
@@ -590,8 +583,6 @@ const Login: React.FC = () => {
             alert("Digite seu e-mail.");
             return;
         }
-
-        // Verify if user exists before sending email to avoid spam to non-users
         const userExists = await getUserByEmail(forgotEmail);
         
         if (!userExists) {
@@ -600,8 +591,6 @@ const Login: React.FC = () => {
         }
 
         setIsSendingForgot(true);
-        
-        // Link points to our app's reset page
         const resetLink = `${window.location.href.split('#')[0]}#/reset-password?id=${userExists.id}`;
 
         const templateParams = {
@@ -617,10 +606,7 @@ const Login: React.FC = () => {
 
         try {
             // @ts-ignore
-            if (!window.emailjs) {
-                throw new Error("Biblioteca de email não carregada.");
-            }
-
+            if (!window.emailjs) throw new Error("Biblioteca de email não carregada.");
             // @ts-ignore
             await window.emailjs.send(APP_CONFIG.EMAILJS.SERVICE_ID, APP_CONFIG.EMAILJS.TEMPLATE_ID, templateParams, APP_CONFIG.EMAILJS.PUBLIC_KEY);
             alert(`E-mail enviado para ${forgotEmail}. Verifique sua caixa de entrada.`);
@@ -637,46 +623,46 @@ const Login: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-100 via-white to-sky-50 max-w-md mx-auto relative overflow-hidden">
-            <div className="absolute top-[-100px] left-[-100px] w-64 h-64 bg-sky-200 rounded-full blur-3xl opacity-50"></div>
-            <div className="absolute bottom-[-100px] right-[-100px] w-64 h-64 bg-blue-200 rounded-full blur-3xl opacity-50"></div>
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-sky-100 via-white to-sky-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 max-w-md mx-auto relative overflow-hidden">
+            <div className="absolute top-[-100px] left-[-100px] w-64 h-64 bg-sky-200 dark:bg-sky-900/30 rounded-full blur-3xl opacity-50"></div>
+            <div className="absolute bottom-[-100px] right-[-100px] w-64 h-64 bg-blue-200 dark:bg-blue-900/30 rounded-full blur-3xl opacity-50"></div>
 
             <div className="w-24 h-24 bg-gradient-to-tr from-sky-400 to-primary rounded-3xl flex items-center justify-center mb-6 shadow-2xl transform rotate-3">
                 <AppLogo />
             </div>
-            <h1 className="text-3xl font-extrabold text-sky-900 mb-2 text-center tracking-tight">{APP_CONFIG.NAME}</h1>
-            <p className="text-gray-500 mb-8 text-center font-medium">Acesse sua conta para continuar.</p>
+            <h1 className="text-3xl font-extrabold text-sky-900 dark:text-sky-400 mb-2 text-center tracking-tight">{APP_CONFIG.NAME}</h1>
+            <p className="text-gray-500 dark:text-gray-400 mb-8 text-center font-medium">Acesse sua conta para continuar.</p>
             
-            <div className="w-full space-y-4 bg-white/80 backdrop-blur-xl p-6 rounded-3xl border border-white shadow-xl">
+            <div className="w-full space-y-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-6 rounded-3xl border border-white dark:border-slate-700 shadow-xl">
                 
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs font-bold text-gray-500 ml-1 mb-1 block">E-mail ou Usuário</label>
-                    <input className="w-full bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary transition-all" placeholder="ex: usuario@email.com" value={email} onChange={e => setEmail(e.target.value)} />
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 ml-1 mb-1 block">E-mail ou Usuário</label>
+                    <input className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-4 py-3 rounded-xl text-gray-800 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary transition-all" placeholder="ex: usuario@email.com" value={email} onChange={e => setEmail(e.target.value)} />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-500 ml-1 mb-1 block">Senha</label>
-                    <input className="w-full bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary transition-all" placeholder="••••••" type="password" value={password} onChange={e => setPassword(e.target.value)} />
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 ml-1 mb-1 block">Senha</label>
+                    <input className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-4 py-3 rounded-xl text-gray-800 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary transition-all" placeholder="••••••" type="password" value={password} onChange={e => setPassword(e.target.value)} />
                     <div className="text-right mt-1">
-                        <button onClick={() => setForgotOpen(true)} className="text-xs text-sky-600 font-semibold hover:underline">Esqueci minha senha</button>
+                        <button onClick={() => setForgotOpen(true)} className="text-xs text-sky-600 dark:text-sky-400 font-semibold hover:underline">Esqueci minha senha</button>
                     </div>
                   </div>
                   
-                  <button onClick={handleLogin} className="w-full bg-primary text-white font-bold py-3.5 rounded-xl hover:bg-sky-600 transition shadow-lg shadow-sky-200 mt-2">
+                  <button onClick={handleLogin} className="w-full bg-primary text-white font-bold py-3.5 rounded-xl hover:bg-sky-600 transition shadow-lg shadow-sky-200 dark:shadow-sky-900 mt-2">
                     Entrar
                   </button>
                   
                   <div className="relative flex py-2 items-center">
-                        <div className="flex-grow border-t border-gray-200"></div>
+                        <div className="flex-grow border-t border-gray-200 dark:border-slate-700"></div>
                         <span className="flex-shrink-0 mx-4 text-gray-400 text-xs font-bold uppercase">Ou acesse com</span>
-                        <div className="flex-grow border-t border-gray-200"></div>
+                        <div className="flex-grow border-t border-gray-200 dark:border-slate-700"></div>
                   </div>
                   
                   {/* Google Login Button */}
                   <GoogleLoginButton onSuccess={handleGoogleSuccess} onNewUser={handleGoogleNewUser} />
                   
-                  <div className="mt-4 pt-4 border-t border-gray-200 text-center">
-                       <p className="text-sm text-gray-600 mb-2">Não tem uma conta?</p>
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-700 text-center">
+                       <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Não tem uma conta?</p>
                        <Link to="/register" className="text-primary font-bold hover:underline">
                            Criar nova conta
                        </Link>
@@ -685,10 +671,10 @@ const Login: React.FC = () => {
             </div>
 
             <div className="mt-8 text-center space-y-2">
-                <Link to="/admin-login" className="text-xs text-gray-400 hover:text-sky-600 flex items-center justify-center gap-1 transition-colors">
+                <Link to="/admin-login" className="text-xs text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 flex items-center justify-center gap-1 transition-colors">
                      <Shield size={12} /> Acesso Administrativo
                 </Link>
-                <div className="text-[10px] text-gray-300">
+                <div className="text-[10px] text-gray-300 dark:text-slate-600">
                     Ao entrar, você concorda com nossa <Link to="/privacy" className="underline hover:text-sky-500">Política de Privacidade</Link>.
                 </div>
             </div>
@@ -710,7 +696,7 @@ const Login: React.FC = () => {
 // --- Layout Wrapper ---
 const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
     return (
-        <div className="max-w-md mx-auto bg-gradient-to-br from-sky-100 via-white to-sky-50 min-h-screen relative shadow-2xl overflow-hidden flex flex-col">
+        <div className="max-w-md mx-auto bg-gradient-to-br from-sky-100 via-white to-sky-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 min-h-screen relative shadow-2xl overflow-hidden flex flex-col transition-colors duration-300">
             <div className="flex-1 w-full flex flex-col">
               {children}
               <Footer />
@@ -729,8 +715,14 @@ export default function App() {
      seedInitialData();
   }, []);
 
-  // SCALABILITY FIX: Removed global subscribeToUsers
-  // Users are now fetched only when needed (Login or Admin Dashboard)
+  // Update HTML class for dark mode
+  useEffect(() => {
+    if (state.darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [state.darkMode]);
 
   useEffect(() => {
       const unsubscribe = subscribeToVendors((vendors) => {
