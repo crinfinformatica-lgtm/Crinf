@@ -30,19 +30,30 @@ const sanitizePayload = (data: any) => {
     return cleanData;
 };
 
-// Upload Base64 Image to Firebase Storage
+// Upload Base64 Image to Firebase Storage with Timeout
 export const uploadImageToFirebase = async (base64Data: string, path: string): Promise<string> => {
   if (!base64Data) return '';
+  
   try {
     const storageRef = ref(storage, path);
-    // Remove header data usually present in base64 (data:image/jpeg;base64,...)
-    await uploadString(storageRef, base64Data, 'data_url');
+    
+    // Create a timeout promise (25 seconds)
+    const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Tempo limite excedido (25s). Verifique sua internet.")), 25000)
+    );
+
+    // Upload task
+    const uploadTask = uploadString(storageRef, base64Data, 'data_url');
+
+    // Race between upload and timeout
+    await Promise.race([uploadTask, timeoutPromise]);
+
     const url = await getDownloadURL(storageRef);
     return url;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erro upload imagem:", error);
-    // CRITICAL FIX: Throw error instead of returning base64 to prevent DB size limit errors
-    throw new Error("Falha ao processar o upload da imagem. Verifique sua conexão."); 
+    // Throw error so UI knows it failed
+    throw new Error(error.message || "Falha no upload da imagem."); 
   }
 };
 

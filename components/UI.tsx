@@ -68,6 +68,9 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
 
     useEffect(() => {
         setPreview(currentPhotoUrl || null);
+        if (currentPhotoUrl && !currentPhotoUrl.startsWith('data:')) {
+            setUrlInput(currentPhotoUrl);
+        }
     }, [currentPhotoUrl]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,13 +89,15 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
             };
             reader.readAsDataURL(file);
         }
+        // Reset input to allow selecting same file again if needed
+        e.target.value = ''; 
     };
 
-    const handleUrlBlur = () => {
-        if (urlInput) {
-            setPreview(urlInput);
-            onPhotoSelected(urlInput);
-        }
+    const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setUrlInput(val);
+        setPreview(val);
+        onPhotoSelected(val);
     };
 
     return (
@@ -120,7 +125,12 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
                 
                 {preview && (
                     <div className="mb-3 relative w-32 h-32 mx-auto rounded-lg overflow-hidden border border-gray-200 shadow-sm bg-white">
-                        <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+                        <img 
+                            src={preview} 
+                            alt="Preview" 
+                            className="w-full h-full object-cover" 
+                            onError={() => setPreview(null)} 
+                        />
                         <button 
                             type="button"
                             onClick={(e) => {
@@ -162,8 +172,7 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
                             type="text" 
                             placeholder="https://exemplo.com/foto.jpg"
                             value={urlInput}
-                            onChange={(e) => setUrlInput(e.target.value)}
-                            onBlur={handleUrlBlur}
+                            onChange={handleUrlChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
                          />
                          <p className="text-[10px] text-gray-400 mt-2">Dica: Use links diretos que terminem em .jpg ou .png para melhor funcionamento.</p>
@@ -673,7 +682,7 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
 
 // --- NEW APP LOGO (Vertical: Text Top, Graphic Bottom) ---
 export const AppLogo = () => (
-  <svg viewBox="0 0 300 130" className="w-full max-w-[380px] h-auto drop-shadow-lg animate-fade-in mx-auto">
+  <svg viewBox="25 20 250 100" className="w-full max-w-[500px] h-auto drop-shadow-xl animate-fade-in mx-auto">
     <defs>
       <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
         <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
@@ -689,17 +698,17 @@ export const AppLogo = () => (
     </defs>
 
     {/* TEXT ON TOP */}
-    <text x="150" y="24" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="24" fontWeight="900" fill="#0ea5e9" letterSpacing="0.5">O QUE TEM PERTO?</text>
+    <text x="150" y="45" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="26" fontWeight="900" fill="#0ea5e9" letterSpacing="0.5">O QUE TEM PERTO?</text>
 
     {/* GRAPHIC GROUP - Centered Below Text */}
-    <g transform="translate(105, 40)">
+    <g transform="translate(105, 55)">
         {/* Connected Lines */}
-        <line x1="25" y1="30" x2="25" y2="70" stroke="#0c4a6e" strokeWidth="4" />
-        <line x1="25" y1="50" x2="65" y2="50" stroke="#0c4a6e" strokeWidth="4" />
+        <line x1="25" y1="30" x2="25" y2="70" stroke="#0c4a6e" strokeWidth="5" />
+        <line x1="25" y1="50" x2="65" y2="50" stroke="#0c4a6e" strokeWidth="5" />
 
         {/* Circle 1: Shop (Yellow) - Top Left */}
         <g transform="translate(25, 30)">
-            <circle r="18" fill="white" stroke="#facc15" strokeWidth="3" filter="url(#shadow)"/>
+            <circle r="19" fill="white" stroke="#facc15" strokeWidth="3" filter="url(#shadow)"/>
             <g transform="translate(-10, -10) scale(0.8)">
                 <path d="M2 9a3 3 0 0 1 0-6h20a3 3 0 0 1 0 6v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9Z" fill="#facc15"/>
                 <path d="M1 5h22v4H1z" fill="#ca8a04"/>
@@ -708,7 +717,7 @@ export const AppLogo = () => (
 
         {/* Circle 2: Tools (Blue) - Bottom Left */}
         <g transform="translate(25, 70)">
-            <circle r="18" fill="white" stroke="#0ea5e9" strokeWidth="3" filter="url(#shadow)"/>
+            <circle r="19" fill="white" stroke="#0ea5e9" strokeWidth="3" filter="url(#shadow)"/>
             <g transform="translate(-9, -9) scale(0.75)">
                 <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" fill="#0ea5e9"/>
             </g>
@@ -716,7 +725,7 @@ export const AppLogo = () => (
 
         {/* Circle 3: User (Dark Blue) - Right */}
         <g transform="translate(65, 50)">
-            <circle r="18" fill="white" stroke="#0c4a6e" strokeWidth="3" filter="url(#shadow)"/>
+            <circle r="19" fill="white" stroke="#0c4a6e" strokeWidth="3" filter="url(#shadow)"/>
             <g transform="translate(-9, -9) scale(0.75)">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="#0c4a6e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
                 <circle cx="12" cy="7" r="4" fill="#0c4a6e"/>

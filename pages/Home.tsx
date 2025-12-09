@@ -8,8 +8,9 @@ import { useAppContext } from '../App';
 import { interpretSearchQuery } from '../services/geminiService';
 
 // Updated AppLogo - Vertical Layout (Text Top, Icon Bottom)
+// INCREASED SIZE to max-w-[500px] and adjusted viewBox to remove whitespace
 const AppLogo = () => (
-  <svg viewBox="0 0 300 140" className="w-72 h-auto drop-shadow-md animate-fade-in">
+  <svg viewBox="25 20 250 100" className="w-full max-w-[500px] h-auto drop-shadow-lg animate-fade-in">
     <defs>
       <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
         <feGaussianBlur in="SourceAlpha" stdDeviation="1"/>
@@ -25,17 +26,17 @@ const AppLogo = () => (
     </defs>
 
     {/* TEXT ON TOP */}
-    <text x="150" y="28" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="24" fontWeight="900" fill="#0ea5e9" letterSpacing="0.5">O QUE TEM PERTO?</text>
+    <text x="150" y="45" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="26" fontWeight="900" fill="#0ea5e9" letterSpacing="0.5">O QUE TEM PERTO?</text>
 
     {/* GRAPHIC GROUP - Centered Below Text */}
-    <g transform="translate(105, 45)">
+    <g transform="translate(105, 55)">
         {/* Connected Lines */}
-        <line x1="25" y1="30" x2="25" y2="70" stroke="#0c4a6e" strokeWidth="4" />
-        <line x1="25" y1="50" x2="65" y2="50" stroke="#0c4a6e" strokeWidth="4" />
+        <line x1="25" y1="30" x2="25" y2="70" stroke="#0c4a6e" strokeWidth="5" />
+        <line x1="25" y1="50" x2="65" y2="50" stroke="#0c4a6e" strokeWidth="5" />
 
         {/* Circle 1: Shop (Yellow) - Top Left */}
         <g transform="translate(25, 30)">
-            <circle r="18" fill="white" stroke="#facc15" strokeWidth="3" filter="url(#shadow)"/>
+            <circle r="19" fill="white" stroke="#facc15" strokeWidth="3" filter="url(#shadow)"/>
             <g transform="translate(-10, -10) scale(0.8)">
                 <path d="M2 9a3 3 0 0 1 0-6h20a3 3 0 0 1 0 6v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9Z" fill="#facc15"/>
                 <path d="M1 5h22v4H1z" fill="#ca8a04"/>
@@ -44,7 +45,7 @@ const AppLogo = () => (
 
         {/* Circle 2: Tools (Blue) - Bottom Left */}
         <g transform="translate(25, 70)">
-            <circle r="18" fill="white" stroke="#0ea5e9" strokeWidth="3" filter="url(#shadow)"/>
+            <circle r="19" fill="white" stroke="#0ea5e9" strokeWidth="3" filter="url(#shadow)"/>
             <g transform="translate(-9, -9) scale(0.75)">
                 <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" fill="#0ea5e9"/>
             </g>
@@ -52,7 +53,7 @@ const AppLogo = () => (
 
         {/* Circle 3: User (Dark Blue) - Right */}
         <g transform="translate(65, 50)">
-            <circle r="18" fill="white" stroke="#0c4a6e" strokeWidth="3" filter="url(#shadow)"/>
+            <circle r="19" fill="white" stroke="#0c4a6e" strokeWidth="3" filter="url(#shadow)"/>
             <g transform="translate(-9, -9) scale(0.75)">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="#0c4a6e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
                 <circle cx="12" cy="7" r="4" fill="#0c4a6e"/>
@@ -150,8 +151,8 @@ export const Home: React.FC = () => {
             <div className="absolute bottom-[-10%] left-[-10%] w-80 h-80 bg-blue-200/30 rounded-full blur-2xl"></div>
 
             <div className="z-10 w-full flex flex-col items-center text-center">
-                {/* Logo Area */}
-                <div className="mb-8 transform hover:scale-105 transition-transform duration-500">
+                {/* Logo Area - Increased size container */}
+                <div className="mb-6 w-full flex justify-center transform hover:scale-105 transition-transform duration-500">
                     <AppLogo />
                 </div>
                 

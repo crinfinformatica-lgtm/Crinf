@@ -188,7 +188,20 @@ export const SettingsPage: React.FC = () => {
                 setSavingStatus("Enviando imagem...");
                 const fileName = `profile_${Date.now()}.jpg`;
                 const path = `users/${state.currentUser.id}/${fileName}`;
-                finalPhotoUrl = await uploadImageToFirebase(editPhoto, path);
+                
+                try {
+                    finalPhotoUrl = await uploadImageToFirebase(editPhoto, path);
+                } catch(e) {
+                    console.error("Upload failed", e);
+                    alert("Aviso: Falha no envio da foto. O perfil será salvo com a imagem anterior ou padrão.");
+                    // Keep the photo as is if upload fails, or revert to current user photo
+                    finalPhotoUrl = state.currentUser.photoUrl || "https://placehold.co/400x300/e0f2fe/1e3a8a?text=Sem+Foto";
+                }
+            }
+
+            // SAFETY CHECK: Ensure photoUrl is never empty or null
+            if (!finalPhotoUrl || finalPhotoUrl.trim() === '') {
+                 finalPhotoUrl = state.currentUser.photoUrl || "https://placehold.co/400x300/e0f2fe/1e3a8a?text=Sem+Foto";
             }
 
             setSavingStatus("Atualizando dados...");

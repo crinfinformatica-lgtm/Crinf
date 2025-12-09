@@ -245,7 +245,13 @@ export const Register: React.FC = () => {
             let finalPhotoUrl = photoPreview;
             if (photoPreview && photoPreview.startsWith('data:')) {
                 setRegisterStatus("Enviando foto...");
-                finalPhotoUrl = await uploadImageToFirebase(photoPreview, `users/${newId}/profile.jpg`);
+                try {
+                    finalPhotoUrl = await uploadImageToFirebase(photoPreview, `users/${newId}/profile.jpg`);
+                } catch(e) {
+                    console.error("Foto upload fail", e);
+                    alert("Aviso: Falha ao enviar a foto. O cadastro seguirá sem foto de perfil.");
+                    finalPhotoUrl = null;
+                }
             }
 
             const newUser = {
@@ -316,6 +322,7 @@ export const Register: React.FC = () => {
                     } catch(e) {
                         console.error("Foto upload fail", e);
                         alert("Aviso: Falha ao enviar a foto. Usando imagem padrão.");
+                        // Fallback to placeholder is already set
                     }
                 } else {
                     // It's a direct URL (from web/Google Photos)
@@ -323,6 +330,11 @@ export const Register: React.FC = () => {
                 }
             } else if (isGoogleRegister && photoPreview) {
                  finalPhotoUrl = photoPreview;
+            }
+
+            // Final safety check for empty photo URL to prevent DB errors
+            if (!finalPhotoUrl || finalPhotoUrl.trim() === '') {
+                finalPhotoUrl = `https://placehold.co/400x300/e0f2fe/1e3a8a?text=Sem+Foto&font=roboto`;
             }
 
             setRegisterStatus("Salvando perfil...");
@@ -359,7 +371,8 @@ export const Register: React.FC = () => {
                 address: newVendor.address, 
                 type: UserType.VENDOR,
                 password: password,
-                photoUrl: finalPhotoUrl
+                photoUrl: finalPhotoUrl,
+                subtype: vendorSubtype // Ensure subtype is saved in users collection too
             };
             
             const isDuplicateEmailUser = state.users.some(u => u.email === email);
