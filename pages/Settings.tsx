@@ -6,6 +6,7 @@ import { useAppContext } from '../App';
 import { Button, Input, Modal, ImageCropper, TwoFactorModal } from '../components/UI';
 import { UserType as UserEnum, CATEGORIES } from '../types';
 import { uploadImageToFirebase, updateVendorPartial } from '../services/firebaseService';
+import { ALLOWED_NEIGHBORHOODS } from '../config';
 
 // Lazy load admin dashboard
 const AdminDashboard = React.lazy(() => import('./AdminDashboard').then(module => ({ default: module.AdminDashboard })));
@@ -106,8 +107,8 @@ export const SettingsPage: React.FC = () => {
 
     const handleShareApp = async () => {
         const shareData = {
-            title: 'O Que Tem Perto?',
-            text: 'Descubra os melhores comércios e serviços de Campo Largo no app O Que Tem Perto!',
+            title: 'O Que Tem Perto? - Águas Claras',
+            text: 'Descubra os melhores comércios e serviços de Águas Claras e região no app O Que Tem Perto!',
             url: window.location.href.split('#')[0]
         };
     
@@ -181,6 +182,12 @@ export const SettingsPage: React.FC = () => {
 
     const handleSaveProfile = async () => {
         if (!state.currentUser) return;
+
+        if (!editNeighborhood) {
+            alert("Por favor, selecione um bairro válido.");
+            return;
+        }
+
         setIsSaving(true);
         setSavingStatus("Iniciando...");
         
@@ -417,7 +424,19 @@ export const SettingsPage: React.FC = () => {
                         <Input label="Rua / Logradouro" value={editStreet} onChange={e => setEditStreet(e.target.value)} className="bg-white" />
                         <div className="grid grid-cols-2 gap-2">
                              <Input label="Número" value={editNumber} onChange={e => setEditNumber(e.target.value)} className="bg-white" />
-                             <Input label="Bairro" value={editNeighborhood} onChange={e => setEditNeighborhood(e.target.value)} className="bg-white" />
+                             <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Bairro</label>
+                                <select 
+                                    value={editNeighborhood} 
+                                    onChange={e => setEditNeighborhood(e.target.value)} 
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-primary text-sm"
+                                >
+                                    <option value="">Selecione...</option>
+                                    {ALLOWED_NEIGHBORHOODS.map(n => (
+                                        <option key={n} value={n}>{n}</option>
+                                    ))}
+                                </select>
+                             </div>
                         </div>
                      </div>
 

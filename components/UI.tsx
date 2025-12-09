@@ -567,11 +567,11 @@ export const AppLogo = () => (
     </text>
     <g transform="translate(100, 95)">
        <text x="0" y="25" textAnchor="middle" fontSize="65" fontWeight="900" fill="white" stroke="#1e3a8a" strokeWidth="2.5" style={{ fontFamily: 'Arial, sans-serif' }}>
-         CL
+         AC
        </text>
     </g>
-    <text x="100" y="138" textAnchor="middle" fontSize="13" fontWeight="800" fill="#1e3a8a" letterSpacing="0.5">
-        CAMPO LARGO/PR
+    <text x="100" y="138" textAnchor="middle" fontSize="11" fontWeight="800" fill="#1e3a8a" letterSpacing="0.5">
+        ÁGUAS CLARAS E REGIÃO
     </text>
     <g transform="translate(100, 165)" fill="none" stroke="#1e3a8a" strokeWidth="2">
         <path d="M -18,-6 L 18,-6 L 14,-14 L -14,-14 Z" strokeLinejoin="round" fill="#60a5fa" fillOpacity="0.3" />

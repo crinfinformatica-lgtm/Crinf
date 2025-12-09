@@ -1,21 +1,22 @@
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, Suspense, lazy, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera, Upload, X, MapPin, Heart, Check } from 'lucide-react';
+import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera, Upload, X, MapPin, Heart, Check, FileText } from 'lucide-react';
 import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum, CATEGORIES, SecurityLog } from './types';
 import { getUserLocation, calculateDistance } from './services/geoService';
 import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo, ImageCropper, GoogleLoginButton } from './components/UI';
-import { subscribeToUsers, subscribeToVendors, subscribeToBanned, saveUserToFirebase, saveVendorToFirebase, deleteUserFromFirebase, deleteVendorFromFirebase, banItemInFirebase, unbanItemInFirebase, seedInitialData, recordFailedLogin, successfulLogin, unlockUserAccount } from './services/firebaseService';
+import { subscribeToVendors, subscribeToBanned, saveUserToFirebase, saveVendorToFirebase, deleteUserFromFirebase, deleteVendorFromFirebase, banItemInFirebase, unbanItemInFirebase, seedInitialData, recordFailedLogin, successfulLogin, unlockUserAccount, getUserByEmail } from './services/firebaseService';
+import { APP_CONFIG } from './config';
 
 // --- CONSTANTS ---
-const CURRENT_DB_VERSION = '2.0'; 
+const CURRENT_DB_VERSION = APP_CONFIG.VERSION; 
 
 // --- Lazy Loading Pages ---
 const HomePage = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })));
 const VendorDetails = lazy(() => import('./pages/VendorDetails').then(module => ({ default: module.VendorDetails })));
 const Register = lazy(() => import('./pages/Register').then(module => ({ default: module.Register })));
-// Admin Dashboard is now integrated into SettingsPage, but keeping lazy import if needed elsewhere or for routing safety
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy').then(module => ({ default: module.PrivacyPolicy })));
 
 // --- Loading Component ---
 const PageLoader = () => (
@@ -26,11 +27,10 @@ const PageLoader = () => (
 );
 
 // --- State Management ---
-// Initial state is mostly empty now, populated by Firebase
 const initialState: AppState = {
     version: CURRENT_DB_VERSION,
     currentUser: null,
-    users: [],
+    users: [], // Will now be empty for regular users, populated only for admin
     vendors: [],
     bannedDocuments: [],
     searchQuery: '',
@@ -182,15 +182,20 @@ const Footer = () => {
       <p className="text-[10px] text-gray-400 font-medium">
         Desenvolvido por <span className="text-primary font-bold">Crinf-Informática</span>
       </p>
-      <a 
-        href="https://instagram.com/crinfinformatica" 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="inline-flex items-center justify-center gap-1 mt-1 text-sky-600 hover:text-sky-800 text-[11px] font-semibold transition-colors"
-      >
-        <Instagram size={12} />
-        @crinfinformatica
-      </a>
+      <div className="flex justify-center gap-4 mt-2">
+          <a 
+            href="https://instagram.com/crinfinformatica" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 text-[11px] font-semibold transition-colors"
+          >
+            <Instagram size={12} />
+            @crinfinformatica
+          </a>
+          <Link to="/privacy" className="inline-flex items-center gap-1 text-gray-400 hover:text-gray-600 text-[11px] font-medium transition-colors">
+              <FileText size={12} /> Política de Privacidade
+          </Link>
+      </div>
     </div>
   );
 };
@@ -200,7 +205,7 @@ const BottomNav = () => {
   const location = useLocation();
   const { state } = useAppContext();
   
-  if (['/register', '/login', '/admin-login', '/reset-password'].includes(location.pathname)) return null;
+  if (['/register', '/login', '/admin-login', '/reset-password', '/privacy'].includes(location.pathname)) return null;
 
   const navClass = (path: string) => 
     `flex flex-col items-center p-2 text-xs font-medium transition-colors ${location.pathname === path ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`;
@@ -300,409 +305,10 @@ const ResetPasswordPage: React.FC = () => {
 };
 
 // --- Settings Page ---
-const SettingsPage: React.FC = () => {
-    const { state, dispatch } = useAppContext();
-    const navigate = useNavigate();
-    
-    // Change Password State
-    const [isChangePassOpen, setChangePassOpen] = useState(false);
-    const [newPass, setNewPass] = useState('');
-    const [confirmPass, setConfirmPass] = useState('');
+// Imported from separate file via lazy load, but referenced here for routing
 
-    // Edit Profile State
-    const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
-    const [editName, setEditName] = useState('');
-    const [editPhoto, setEditPhoto] = useState('');
-    
-    // Donation State
-    const [isDonationOpen, setDonationOpen] = useState(false);
-    const [isPixCopied, setIsPixCopied] = useState(false);
-    const pixKey = "crinf.negocios@gmail.com";
-    
-    // Cropper State
-    const [imageToCrop, setImageToCrop] = useState<string | null>(null);
-    
-    // Separated Address Edit
-    const [editStreet, setEditStreet] = useState('');
-    const [editNumber, setEditNumber] = useState('');
-    const [editNeighborhood, setEditNeighborhood] = useState('');
+const SettingsPage = lazy(() => import('./pages/Settings').then(module => ({ default: module.SettingsPage })));
 
-    // Vendor Specific Edit
-    const [editPhone, setEditPhone] = useState('');
-    const [editDescription, setEditDescription] = useState('');
-    const [editCategory, setEditCategory] = useState('');
-
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        if (state.currentUser && isEditProfileOpen) {
-            setEditName(state.currentUser.name);
-            setEditPhoto(state.currentUser.photoUrl || '');
-            
-            const fullAddress = state.currentUser.address || '';
-            const parts = fullAddress.split(',');
-            if (parts.length >= 2) {
-                setEditStreet(parts[0].trim());
-                const rest = parts.slice(1).join(',');
-                const dashParts = rest.split('-');
-                if (dashParts.length >= 1) {
-                    setEditNumber(dashParts[0].trim());
-                }
-                if (dashParts.length >= 2) {
-                    setEditNeighborhood(dashParts[1].trim());
-                }
-            } else {
-                setEditStreet(fullAddress);
-            }
-
-            if (state.currentUser.type === UserEnum.VENDOR) {
-                const vendorData = state.vendors.find(v => v.id === state.currentUser?.id);
-                if (vendorData) {
-                    setEditPhone(vendorData.phone);
-                    setEditDescription(vendorData.description);
-                    setEditCategory(vendorData.categories[0] || '');
-                }
-            }
-        }
-    }, [isEditProfileOpen, state.currentUser, state.vendors]);
-
-    const handleLogout = () => {
-        if(confirm("Tem certeza que deseja sair?")) {
-            dispatch({ type: 'LOGOUT' });
-            navigate('/');
-        }
-    };
-
-    const handleShareApp = async () => {
-        const shareData = {
-            title: 'O Que Tem Perto?',
-            text: 'Descubra os melhores comércios e serviços de Campo Largo no app O Que Tem Perto!',
-            url: window.location.href.split('#')[0]
-        };
-    
-        if (navigator.share) {
-            try {
-                await navigator.share(shareData);
-            } catch (err) {
-                console.log('Error sharing', err);
-            }
-        } else {
-            navigator.clipboard.writeText(shareData.url);
-            alert('Link do aplicativo copiado para a área de transferência!');
-        }
-    };
-    
-    const handleChangePassword = () => {
-        if (!state.currentUser) return;
-        if (newPass.length < 4) {
-            alert("A senha deve ter pelo menos 4 caracteres.");
-            return;
-        }
-        if (newPass !== confirmPass) {
-            alert("As senhas não conferem.");
-            return;
-        }
-        
-        dispatch({ 
-            type: 'CHANGE_OWN_PASSWORD', 
-            payload: { id: state.currentUser.id, newPass } 
-        });
-        
-        alert("Senha alterada com sucesso!");
-        setChangePassOpen(false);
-        setNewPass('');
-        setConfirmPass('');
-    };
-
-    const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImageToCrop(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-        e.target.value = '';
-    };
-
-    const handleCropComplete = (croppedBase64: string) => {
-        setEditPhoto(croppedBase64);
-        setImageToCrop(null);
-    };
-
-    const handleSaveProfile = () => {
-        if (!state.currentUser) return;
-        
-        const fullAddress = `${editStreet}, ${editNumber} - ${editNeighborhood} - Campo Largo/PR`;
-
-        const updatedUser: any = {
-            ...state.currentUser,
-            name: editName,
-            address: fullAddress,
-            photoUrl: editPhoto,
-        };
-
-        if (state.currentUser.type === UserEnum.VENDOR) {
-            updatedUser.phone = editPhone;
-            updatedUser.description = editDescription;
-            updatedUser.categories = [editCategory];
-        }
-        
-        dispatch({ type: 'UPDATE_USER', payload: updatedUser });
-        alert("Perfil atualizado com sucesso!");
-        setIsEditProfileOpen(false);
-    };
-    
-    const handleCopyPix = () => {
-        navigator.clipboard.writeText(pixKey);
-        setIsPixCopied(true);
-        setTimeout(() => setIsPixCopied(false), 2000);
-    };
-
-    const isAdminOrMaster = state.currentUser?.type === UserEnum.ADMIN || state.currentUser?.type === UserEnum.MASTER;
-
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-sky-100 via-white to-sky-50 pb-24">
-             <div className="bg-white p-6 pb-8 shadow-sm rounded-b-[2rem] mb-6">
-                 <h1 className="text-2xl font-bold text-sky-900 mb-6">Ajustes</h1>
-                 
-                 {state.currentUser ? (
-                     <div className="flex items-center gap-4">
-                         <div className="w-16 h-16 bg-sky-100 rounded-full flex items-center justify-center border-4 border-white shadow-md overflow-hidden relative group">
-                             {state.currentUser.photoUrl ? (
-                                 <img src={state.currentUser.photoUrl} alt="Perfil" className="w-full h-full object-cover" />
-                             ) : (
-                                 <User size={32} className="text-sky-500" />
-                             )}
-                         </div>
-                         <div className="flex-1">
-                             <div className="flex justify-between items-start">
-                                <div>
-                                    <h2 className="text-lg font-bold text-gray-800">{state.currentUser.name}</h2>
-                                    <p className="text-sm text-gray-500">{state.currentUser.email}</p>
-                                    <span className="text-[10px] bg-sky-50 text-sky-600 px-2 py-0.5 rounded-full border border-sky-100 font-semibold uppercase mt-1 inline-block">
-                                        {state.currentUser.type === UserEnum.MASTER ? 'Conta Master' : 
-                                        state.currentUser.type === UserEnum.ADMIN ? 'Administrador' : 
-                                        state.currentUser.type === UserEnum.VENDOR ? 'Conta Comercial' : 'Cliente'}
-                                    </span>
-                                </div>
-                                <button 
-                                    onClick={() => setIsEditProfileOpen(true)}
-                                    className="p-2 text-sky-600 bg-sky-50 rounded-full hover:bg-sky-100 shadow-sm"
-                                >
-                                    <Edit3 size={18} />
-                                </button>
-                             </div>
-                         </div>
-                     </div>
-                 ) : (
-                     <div className="text-center py-4">
-                         <p className="text-gray-500 mb-4">Você não está logado.</p>
-                         <Button onClick={() => navigate('/login')} fullWidth>Entrar na Conta</Button>
-                     </div>
-                 )}
-             </div>
-
-             <div className="px-4 space-y-4">
-                {state.currentUser && (
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div 
-                            onClick={() => setChangePassOpen(true)}
-                            className="p-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50"
-                        >
-                            <div className="flex items-center gap-3">
-                                <Lock size={20} className="text-gray-400" />
-                                <span className="text-gray-700 font-medium">Alterar Senha</span>
-                            </div>
-                            <ChevronRight size={16} className="text-gray-300" />
-                        </div>
-                    </div>
-                )}
-
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="p-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50">
-                        <div className="flex items-center gap-3">
-                            <Bell size={20} className="text-gray-400" />
-                            <span className="text-gray-700 font-medium">Notificações</span>
-                        </div>
-                        <div className="w-10 h-6 bg-green-500 rounded-full relative">
-                            <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
-                        </div>
-                    </div>
-                    
-                    <div 
-                        onClick={handleShareApp}
-                        className="p-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50"
-                    >
-                        <div className="flex items-center gap-3">
-                            <Share2 size={20} className="text-gray-400" />
-                            <span className="text-gray-700 font-medium">Compartilhar App</span>
-                        </div>
-                        <ChevronRight size={16} className="text-gray-300" />
-                    </div>
-
-                    <div className="p-4 border-b border-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-50">
-                        <div className="flex items-center gap-3">
-                            <Moon size={20} className="text-gray-400" />
-                            <span className="text-gray-700 font-medium">Modo Escuro</span>
-                        </div>
-                        <div className="w-10 h-6 bg-gray-200 rounded-full relative">
-                            <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
-                        </div>
-                    </div>
-
-                    <div 
-                        onClick={() => setDonationOpen(true)}
-                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-red-50 group transition-colors"
-                    >
-                        <div className="flex items-center gap-3">
-                            <Heart size={20} className="text-red-400 group-hover:fill-red-400 transition-all" />
-                            <span className="text-gray-700 font-medium group-hover:text-red-500">Apoie o Projeto</span>
-                        </div>
-                        <ChevronRight size={16} className="text-gray-300" />
-                    </div>
-                </div>
-
-                {/* --- ADMIN DASHBOARD EMBEDDED --- */}
-                {isAdminOrMaster && (
-                    <div className="mt-6">
-                        <Suspense fallback={<div className="p-4 text-center text-gray-400">Carregando painel...</div>}>
-                            <AdminDashboard />
-                        </Suspense>
-                    </div>
-                )}
-
-                {state.currentUser && (
-                    <button 
-                        onClick={handleLogout}
-                        className="w-full bg-white text-red-500 font-semibold p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center gap-2 hover:bg-red-50 transition-colors mt-6"
-                    >
-                        <LogOut size={20} />
-                        Sair da Conta
-                    </button>
-                )}
-                
-                <div className="text-center pt-8 pb-4">
-                    <p className="text-xs text-gray-400">Versão do App: {CURRENT_DB_VERSION} (PWA)</p>
-                </div>
-             </div>
-             
-             {/* Change Password Modal */}
-             <Modal isOpen={isChangePassOpen} onClose={() => setChangePassOpen(false)} title="Alterar Senha">
-                 <div className="space-y-4">
-                     <p className="text-sm text-gray-600 mb-2">Defina sua nova senha de acesso.</p>
-                     <Input label="Nova Senha" type="password" value={newPass} onChange={e => setNewPass(e.target.value)} />
-                     <Input label="Confirmar Senha" type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} />
-                     <Button fullWidth onClick={handleChangePassword}>Salvar Nova Senha</Button>
-                 </div>
-             </Modal>
-
-             {/* Edit Profile Modal */}
-             <Modal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} title="Editar Meus Dados">
-                 <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-                     <Input label="Nome" value={editName} onChange={e => setEditName(e.target.value)} />
-                     
-                     <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Endereço</label>
-                        <Input label="Rua / Logradouro" value={editStreet} onChange={e => setEditStreet(e.target.value)} className="bg-white" />
-                        <div className="grid grid-cols-2 gap-2">
-                             <Input label="Número" value={editNumber} onChange={e => setEditNumber(e.target.value)} className="bg-white" />
-                             <Input label="Bairro" value={editNeighborhood} onChange={e => setEditNeighborhood(e.target.value)} className="bg-white" />
-                        </div>
-                     </div>
-
-                     {state.currentUser?.type === UserEnum.VENDOR && (
-                         <>
-                            <Input label="Telefone / WhatsApp" value={editPhone} onChange={e => setEditPhone(e.target.value)} />
-                            <div className="mb-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                                <select 
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white outline-none"
-                                    value={editCategory}
-                                    onChange={(e) => setEditCategory(e.target.value)}
-                                >
-                                    {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                                </select>
-                            </div>
-                            <Input label="Descrição" multiline value={editDescription} onChange={e => setEditDescription(e.target.value)} />
-                         </>
-                     )}
-                     
-                     <div className="mb-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Alterar Foto</label>
-                        <div className="flex gap-2 items-center">
-                            <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex-shrink-0">
-                                {editPhoto ? (
-                                    <img src={editPhoto} className="w-full h-full object-cover" alt="Prev" />
-                                ) : (
-                                    <User className="w-full h-full p-4 text-gray-300" />
-                                )}
-                            </div>
-                            <div className="flex-1">
-                                <button 
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="w-full py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 flex items-center justify-center gap-2"
-                                >
-                                    <Upload size={16} /> Carregar e Ajustar
-                                </button>
-                                <input 
-                                    ref={fileInputRef} 
-                                    type="file" 
-                                    className="hidden" 
-                                    accept="image/*"
-                                    onChange={handlePhotoFileChange}
-                                />
-                            </div>
-                        </div>
-                     </div>
-                     
-                     <Button fullWidth onClick={handleSaveProfile}>Salvar Alterações</Button>
-                 </div>
-             </Modal>
-
-             {/* Donation Modal */}
-             <Modal isOpen={isDonationOpen} onClose={() => setDonationOpen(false)} title="Apoie o Projeto">
-                 <div className="text-center space-y-4">
-                     <p className="text-sm text-gray-600 leading-relaxed">
-                         Contribua com o desenvolvimento do aplicativo realizando qualquer valor de doação.
-                     </p>
-                     
-                     <div className="bg-white p-4 rounded-xl border border-gray-200 inline-block shadow-sm">
-                         <img 
-                             src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${pixKey}`} 
-                             alt="QR Code Pix" 
-                             className="w-48 h-48"
-                         />
-                     </div>
-                     
-                     <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                         <p className="text-xs text-gray-500 mb-1">Chave Pix (E-mail)</p>
-                         <p className="font-mono text-sm font-bold text-gray-800 break-all">{pixKey}</p>
-                     </div>
-
-                     <Button 
-                        onClick={handleCopyPix} 
-                        fullWidth 
-                        variant="outline"
-                        className={isPixCopied ? "bg-green-50 border-green-200 text-green-700" : ""}
-                        icon={isPixCopied ? <Check size={18} /> : <Copy size={18} />}
-                     >
-                         {isPixCopied ? "Chave Copiada!" : "Copiar Chave Pix"}
-                     </Button>
-                 </div>
-             </Modal>
-
-             {imageToCrop && (
-                 <ImageCropper 
-                    imageSrc={imageToCrop}
-                    onCropComplete={handleCropComplete}
-                    onCancel={() => setImageToCrop(null)}
-                 />
-             )}
-        </div>
-    );
-};
 
 // --- Dedicated Admin Login (Manual Only) ---
 const AdminLogin: React.FC = () => {
@@ -727,7 +333,7 @@ const AdminLogin: React.FC = () => {
         checkSecurity();
     }, [state.securityLogs]);
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (lockedUntil) {
@@ -740,62 +346,63 @@ const AdminLogin: React.FC = () => {
             }
         }
 
-        const dbMaster = state.users.find(u => u.email === 'crinf.informatica@gmail.com');
-        
+        // Use direct lookup for admin login too, don't rely on state
         let success = false;
         let loggedUser: UserType | null = null;
+        
+        try {
+            const foundUser = await getUserByEmail(email);
 
-        if (dbMaster) {
-            if (dbMaster.password === password) {
+            if (foundUser) {
+                 if (foundUser.type !== UserEnum.ADMIN && foundUser.type !== UserEnum.MASTER) {
+                     alert("Esta conta não possui privilégios administrativos.");
+                     return;
+                 }
+                 if (foundUser.password === password) {
+                     success = true;
+                     loggedUser = foundUser;
+                 }
+            } else if (email === APP_CONFIG.EMAILJS.ADMIN_EMAIL && password === 'Crinf!2025#') {
+                // Fallback Master Login if DB is empty or corrupted
+                 const masterUser: UserType = {
+                    id: 'master_crinf',
+                    name: 'Administrador Crinf',
+                    email: APP_CONFIG.EMAILJS.ADMIN_EMAIL,
+                    cpf: '000.000.000-00',
+                    address: 'Sede Administrativa',
+                    type: UserEnum.MASTER,
+                    photoUrl: undefined,
+                    password: 'Crinf!2025#'
+                };
+                dispatch({ type: 'ADD_USER', payload: masterUser });
                 success = true;
-                loggedUser = dbMaster;
+                loggedUser = masterUser;
             }
-        } else if (email === 'crinf.informatica@gmail.com' && password === 'Crinf!2025#') {
-             const masterUser: UserType = {
-                id: 'master_crinf',
-                name: 'Administrador Crinf',
-                email: 'crinf.informatica@gmail.com',
-                cpf: '000.000.000-00',
-                address: 'Sede Administrativa',
-                type: UserEnum.MASTER,
-                photoUrl: undefined,
-                password: 'Crinf!2025#'
-            };
-            dispatch({ type: 'ADD_USER', payload: masterUser });
-            success = true;
-            loggedUser = masterUser;
-        } else {
-            const foundUser = state.users.find(u => u.email === email && u.type === UserEnum.ADMIN);
-            if (foundUser && foundUser.password === password) {
-                success = true;
-                loggedUser = foundUser;
-            }
-        }
 
-        if (success && loggedUser) {
-            dispatch({ type: 'LOGIN', payload: loggedUser });
-            dispatch({ 
-                type: 'ADD_SECURITY_LOG', 
-                payload: { action: 'LOGIN_SUCCESS', details: `Acesso realizado por ${loggedUser.email}` } 
-            });
-            navigate('/settings'); // REDIRECT TO SETTINGS INSTEAD OF ADMIN
-        } else {
-            dispatch({ 
-                type: 'ADD_SECURITY_LOG', 
-                payload: { action: 'LOGIN_FAIL', details: `Falha de login para o e-mail: ${email}` } 
-            });
-            alert("Senha incorreta ou acesso não autorizado.");
+            if (success && loggedUser) {
+                dispatch({ type: 'LOGIN', payload: loggedUser });
+                dispatch({ 
+                    type: 'ADD_SECURITY_LOG', 
+                    payload: { action: 'LOGIN_SUCCESS', details: `Acesso Admin realizado por ${loggedUser.email}` } 
+                });
+                navigate('/settings'); 
+            } else {
+                dispatch({ 
+                    type: 'ADD_SECURITY_LOG', 
+                    payload: { action: 'LOGIN_FAIL', details: `Falha de login Admin para o e-mail: ${email}` } 
+                });
+                alert("Senha incorreta ou acesso não autorizado.");
+            }
+        } catch(err) {
+            console.error(err);
+            alert("Erro ao tentar login. Verifique sua conexão.");
         }
     };
 
     const handleSendForgotEmail = async () => {
-        const serviceID = 'service_dqxdi2a';
-        const templateID = 'template_8cthxoh';
-        const publicKey = 'NJZigwymrvB_gdLNP'; 
-
         const templateParams = {
-            to_email: 'crinf.informatica@gmail.com',
-            email: 'crinf.informatica@gmail.com', // Added redundant email param
+            to_email: APP_CONFIG.EMAILJS.ADMIN_EMAIL,
+            email: APP_CONFIG.EMAILJS.ADMIN_EMAIL, // Redundant
             to_name: 'Master Crinf',
             subject: 'Recuperação de Acesso',
             message: `Você solicitou a redefinição de senha. 
@@ -805,18 +412,16 @@ const AdminLogin: React.FC = () => {
         };
 
         try {
-            // Check if emailjs is loaded
             // @ts-ignore
             if (!window.emailjs) {
                 throw new Error("Biblioteca de email não carregada.");
             }
 
             // @ts-ignore
-            await window.emailjs.send(serviceID, templateID, templateParams, publicKey);
-            alert("Um link de recuperação foi enviado para o seu e-mail (crinf.informatica@gmail.com). Verifique sua caixa de entrada.");
+            await window.emailjs.send(APP_CONFIG.EMAILJS.SERVICE_ID, APP_CONFIG.EMAILJS.TEMPLATE_ID, templateParams, APP_CONFIG.EMAILJS.PUBLIC_KEY);
+            alert("Um link de recuperação foi enviado para o seu e-mail administrativo. Verifique sua caixa de entrada.");
         } catch (error: any) {
             console.error('FAILED...', error);
-            // More specific error message
             let msg = "Erro ao enviar e-mail.";
             if (error.text) msg += ` Detalhes: ${error.text}`;
             alert(msg + " Tente novamente mais tarde.");
@@ -914,50 +519,56 @@ const Login: React.FC = () => {
     const [isSendingForgot, setIsSendingForgot] = useState(false);
 
     const handleLogin = async () => {
-        if (email.toLowerCase() === 'crinf.informatica@gmail.com') {
+        if (email.toLowerCase() === APP_CONFIG.EMAILJS.ADMIN_EMAIL) {
             alert("Esta conta possui privilégios elevados. Por favor, utilize a área de 'Acesso Administrativo'.");
             navigate('/admin-login');
             return;
         }
 
-        const foundUser = state.users.find(u => u.email === email) as any;
-        
-        if (foundUser) {
-            // Check for persistent ban
-            if (state.bannedDocuments.includes(foundUser.cpf) || state.bannedDocuments.includes(foundUser.email)) {
-                alert("Acesso negado: Esta conta foi banida permanentemente pelo administrador.");
-                return;
-            }
-
-            // Check for persistent lockout (DB based)
-            if (foundUser.lockedUntil && foundUser.lockedUntil > Date.now()) {
-                const remaining = Math.ceil((foundUser.lockedUntil - Date.now()) / 60000);
-                alert(`Conta bloqueada por excesso de tentativas. Tente novamente em ${remaining} minutos ou contate o suporte.`);
-                return;
-            }
-
-            const storedPass = foundUser.password || '123'; 
-
-            if (password === storedPass) {
-                // Successful Login
-                await successfulLogin(foundUser); // Reset lock counters
-                if (password === '123456') {
-                    alert("Sua senha foi redefinida pelo administrador para '123456'. Recomendamos alterá-la em Ajustes.");
+        // SCALABILITY FIX: Do NOT search in state.users. Fetch from DB directly.
+        try {
+            const foundUser = await getUserByEmail(email) as any;
+            
+            if (foundUser) {
+                // Check for persistent ban
+                if (state.bannedDocuments.includes(foundUser.cpf) || state.bannedDocuments.includes(foundUser.email)) {
+                    alert("Acesso negado: Esta conta foi banida permanentemente pelo administrador.");
+                    return;
                 }
-                dispatch({ type: 'LOGIN', payload: foundUser });
-                navigate('/');
-            } else {
-                // Failed Login
-                const attempts = await recordFailedLogin(foundUser);
-                if (attempts && attempts >= 3) {
-                     alert("Muitas tentativas incorretas. Sua conta foi bloqueada por 5 minutos.");
+
+                // Check for persistent lockout (DB based)
+                if (foundUser.lockedUntil && foundUser.lockedUntil > Date.now()) {
+                    const remaining = Math.ceil((foundUser.lockedUntil - Date.now()) / 60000);
+                    alert(`Conta bloqueada por excesso de tentativas. Tente novamente em ${remaining} minutos ou contate o suporte.`);
+                    return;
+                }
+
+                const storedPass = foundUser.password || '123'; 
+
+                if (password === storedPass) {
+                    // Successful Login
+                    await successfulLogin(foundUser); // Reset lock counters
+                    if (password === '123456') {
+                        alert("Sua senha foi redefinida pelo administrador para '123456'. Recomendamos alterá-la em Ajustes.");
+                    }
+                    dispatch({ type: 'LOGIN', payload: foundUser });
+                    navigate('/');
                 } else {
-                     alert(`Senha incorreta. Tentativa ${attempts || 1} de 3.`);
+                    // Failed Login
+                    const attempts = await recordFailedLogin(foundUser);
+                    if (attempts && attempts >= 3) {
+                        alert("Muitas tentativas incorretas. Sua conta foi bloqueada por 5 minutos.");
+                    } else {
+                        alert(`Senha incorreta. Tentativa ${attempts || 1} de 3.`);
+                    }
                 }
+            } else {
+                // User not found
+                alert("Usuário não encontrado ou senha incorreta.");
             }
-        } else {
-             // User not found
-             alert("Usuário não encontrado ou senha incorreta.");
+        } catch(err) {
+            console.error("Login error", err);
+            alert("Erro ao realizar login. Verifique sua conexão.");
         }
     };
     
@@ -980,23 +591,22 @@ const Login: React.FC = () => {
             return;
         }
 
-        const userExists = state.users.find(u => u.email.toLowerCase() === forgotEmail.toLowerCase());
+        // Verify if user exists before sending email to avoid spam to non-users
+        const userExists = await getUserByEmail(forgotEmail);
+        
         if (!userExists) {
             alert("E-mail não encontrado no sistema.");
             return;
         }
 
         setIsSendingForgot(true);
-        const serviceID = 'service_dqxdi2a';
-        const templateID = 'template_8cthxoh';
-        const publicKey = 'NJZigwymrvB_gdLNP'; 
         
         // Link points to our app's reset page
         const resetLink = `${window.location.href.split('#')[0]}#/reset-password?id=${userExists.id}`;
 
         const templateParams = {
             to_email: userExists.email,
-            email: userExists.email, // Added redundant email param
+            email: userExists.email,
             to_name: userExists.name,
             subject: 'Recuperação de Senha',
             message: `Você solicitou a recuperação de senha. 
@@ -1006,20 +616,18 @@ const Login: React.FC = () => {
         };
 
         try {
-            // Check library
             // @ts-ignore
             if (!window.emailjs) {
                 throw new Error("Biblioteca de email não carregada.");
             }
 
             // @ts-ignore
-            await window.emailjs.send(serviceID, templateID, templateParams, publicKey);
+            await window.emailjs.send(APP_CONFIG.EMAILJS.SERVICE_ID, APP_CONFIG.EMAILJS.TEMPLATE_ID, templateParams, APP_CONFIG.EMAILJS.PUBLIC_KEY);
             alert(`E-mail enviado para ${forgotEmail}. Verifique sua caixa de entrada.`);
             setForgotOpen(false);
             setForgotEmail('');
         } catch (error: any) {
             console.error('FAILED...', error);
-            // More specific error message
             let msg = "Erro ao enviar e-mail.";
             if (error.text) msg += ` Detalhes: ${error.text}`;
             alert(msg + " Tente novamente mais tarde.");
@@ -1036,7 +644,7 @@ const Login: React.FC = () => {
             <div className="w-24 h-24 bg-gradient-to-tr from-sky-400 to-primary rounded-3xl flex items-center justify-center mb-6 shadow-2xl transform rotate-3">
                 <AppLogo />
             </div>
-            <h1 className="text-3xl font-extrabold text-sky-900 mb-2 text-center tracking-tight">O Que Tem Perto?</h1>
+            <h1 className="text-3xl font-extrabold text-sky-900 mb-2 text-center tracking-tight">{APP_CONFIG.NAME}</h1>
             <p className="text-gray-500 mb-8 text-center font-medium">Acesse sua conta para continuar.</p>
             
             <div className="w-full space-y-4 bg-white/80 backdrop-blur-xl p-6 rounded-3xl border border-white shadow-xl">
@@ -1076,10 +684,13 @@ const Login: React.FC = () => {
                 </div>
             </div>
 
-            <div className="mt-8">
-                <Link to="/admin-login" className="text-xs text-gray-400 hover:text-sky-600 flex items-center gap-1 transition-colors">
+            <div className="mt-8 text-center space-y-2">
+                <Link to="/admin-login" className="text-xs text-gray-400 hover:text-sky-600 flex items-center justify-center gap-1 transition-colors">
                      <Shield size={12} /> Acesso Administrativo
                 </Link>
+                <div className="text-[10px] text-gray-300">
+                    Ao entrar, você concorda com nossa <Link to="/privacy" className="underline hover:text-sky-500">Política de Privacidade</Link>.
+                </div>
             </div>
 
             {/* Forgot Password Modal */}
@@ -1118,12 +729,8 @@ export default function App() {
      seedInitialData();
   }, []);
 
-  useEffect(() => {
-      const unsubscribe = subscribeToUsers((users) => {
-          dispatch({ type: 'SET_USERS', payload: users });
-      });
-      return () => unsubscribe();
-  }, []);
+  // SCALABILITY FIX: Removed global subscribeToUsers
+  // Users are now fetched only when needed (Login or Admin Dashboard)
 
   useEffect(() => {
       const unsubscribe = subscribeToVendors((vendors) => {
@@ -1180,6 +787,7 @@ export default function App() {
                     <Route path="/admin-login" element={<AdminLogin />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    <Route path="/privacy" element={<PrivacyPolicy />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </Suspense>

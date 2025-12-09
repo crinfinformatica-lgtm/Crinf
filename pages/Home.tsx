@@ -35,15 +35,15 @@ const AppLogo = () => (
 
     {/* Center Graphic */}
     <g transform="translate(100, 95)">
-       {/* "CL" Text - Now Uppercase */}
+       {/* "AC" Text - Now Uppercase */}
        <text x="0" y="25" textAnchor="middle" fontSize="65" fontWeight="900" fill="white" stroke="#1e3a8a" strokeWidth="2.5" style={{ fontFamily: 'Arial, sans-serif' }}>
-         CL
+         AC
        </text>
     </g>
 
     {/* Bottom Text - City */}
-    <text x="100" y="138" textAnchor="middle" fontSize="13" fontWeight="800" fill="#1e3a8a" letterSpacing="0.5">
-        CAMPO LARGO/PR
+    <text x="100" y="138" textAnchor="middle" fontSize="11" fontWeight="800" fill="#1e3a8a" letterSpacing="0.5">
+        ÁGUAS CLARAS E REGIÃO
     </text>
 
     {/* Bottom Icons - Unified Store/Service Icon */}
@@ -97,7 +97,7 @@ export const Home: React.FC = () => {
   const handleShareApp = async () => {
     const shareData = {
         title: 'O Que Tem Perto?',
-        text: 'Descubra os melhores comércios e serviços de Campo Largo no app O Que Tem Perto!',
+        text: 'Descubra os melhores comércios e serviços de Águas Claras e região no app O Que Tem Perto!',
         url: window.location.href.split('#')[0]
     };
 
@@ -154,7 +154,7 @@ export const Home: React.FC = () => {
                 </div>
                 
                 <p className="text-gray-500 mb-10 text-sm max-w-xs mx-auto font-medium">
-                    Descubra os melhores serviços e comércios de Campo Largo em um só lugar.
+                    Descubra os melhores serviços e comércios da região do Águas Claras em um só lugar.
                 </p>
                 
                 {/* Main Action Buttons */}
@@ -199,7 +199,7 @@ export const Home: React.FC = () => {
             <div className="cursor-pointer" onClick={goHome}>
                 <h1 className="text-xl font-extrabold tracking-tight text-sky-900">O Que Tem Perto?</h1>
                 <p className="text-sky-600 text-xs flex items-center font-medium bg-sky-50 inline-block px-2 py-0.5 rounded-md mt-1 border border-sky-100">
-                    <MapPin size={10} className="mr-1" /> Campo Largo/PR
+                    <MapPin size={10} className="mr-1" /> Águas Claras e Região
                 </p>
             </div>
             {!state.currentUser && (
@@ -224,7 +224,7 @@ export const Home: React.FC = () => {
         <form onSubmit={handleSearch} className="relative">
           <input
             type="text"
-            placeholder="Buscar em Campo Largo..."
+            placeholder="Buscar em Águas Claras..."
             className="w-full pl-12 pr-4 py-4 rounded-2xl bg-gray-50 text-gray-900 shadow-inner border border-gray-200 focus:border-primary focus:ring-2 focus:ring-sky-100 focus:outline-none placeholder-gray-400 transition-all"
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
@@ -289,7 +289,7 @@ export const Home: React.FC = () => {
       <div className="px-4">
         <div className="flex justify-between items-center mb-3">
             <h2 className="text-sky-900 font-bold text-lg">
-                {state.selectedCategory ? `${state.selectedCategory} em Campo Largo` : 'Destaques da Cidade'}
+                {state.selectedCategory ? `${state.selectedCategory} na Região` : 'Destaques Locais'}
             </h2>
             {state.userLocation && (
                 <span className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-full flex items-center font-bold">
@@ -303,7 +303,7 @@ export const Home: React.FC = () => {
             <div className="bg-sky-50 rounded-full h-20 w-20 flex items-center justify-center mx-auto mb-4">
                 <Search className="text-primary" size={32}/>
             </div>
-            <p className="text-gray-500 font-medium">Nenhum resultado encontrado.</p>
+            <p className="text-gray-500 font-medium">Nenhum resultado encontrado nesta área.</p>
             {maxDistance !== null && (
                 <p className="text-xs text-gray-400 mt-2">Tente aumentar o raio de distância.</p>
             )}

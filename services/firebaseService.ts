@@ -46,7 +46,35 @@ export const uploadImageToFirebase = async (base64Data: string, path: string): P
   }
 };
 
-// --- AUTHENTICATION ---
+// --- AUTHENTICATION & USERS ---
+
+// Otimização: Buscar usuário específico pelo e-mail em vez de baixar todos
+export const getUserByEmail = async (email: string): Promise<User | null> => {
+    try {
+        // Verificar primeiro se é o Master Hardcoded
+        if (email === MASTER_USER.email) {
+             // Verificar se existe no banco para pegar dados atualizados
+             const masterRef = doc(db, "users", MASTER_USER.id);
+             const masterSnap = await getDoc(masterRef);
+             if (masterSnap.exists()) {
+                 return masterSnap.data() as User;
+             }
+             return MASTER_USER;
+        }
+
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("email", "==", email));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            return querySnapshot.docs[0].data() as User;
+        }
+        return null;
+    } catch (error) {
+        console.error("Erro ao buscar usuário:", error);
+        return null;
+    }
+};
 
 export const signInWithGoogle = async (): Promise<{ user: User | null, isNewUser: boolean, googleData?: any }> => {
     const provider = new GoogleAuthProvider();
@@ -57,16 +85,10 @@ export const signInWithGoogle = async (): Promise<{ user: User | null, isNewUser
 
         if (!email) throw new Error("Google não forneceu o e-mail.");
 
-        // Verificar se usuário já existe no Firestore (users collection)
-        // Precisamos verificar tanto pelo ID quanto pesquisar pelo e-mail
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("email", "==", email));
-        const querySnapshot = await getDocs(q);
+        const existingUser = await getUserByEmail(email);
 
-        if (!querySnapshot.empty) {
-            // Usuário existe
-            const userData = querySnapshot.docs[0].data() as User;
-            return { user: userData, isNewUser: false };
+        if (existingUser) {
+            return { user: existingUser, isNewUser: false };
         } else {
             // Usuário não existe no nosso banco, retornar dados para cadastro
             return { 
@@ -265,13 +287,11 @@ export const unbanItemInFirebase = async (value: string) => {
 
 // Setup Initial Data (Populate Firebase if empty)
 export const seedInitialData = async () => {
-    // Check local storage to prevent re-seeding if user deleted data on purpose
     if (localStorage.getItem('app_seeded_v8') === 'true') {
         return;
     }
 
     try {
-        // 1. Check if Master User exists
         const masterRef = doc(db, "users", MASTER_USER.id);
         const masterSnap = await getDoc(masterRef);
 
@@ -281,7 +301,6 @@ export const seedInitialData = async () => {
             await setDoc(masterRef, cleanMaster);
         }
 
-        // 2. Check if vendors exist, if not seed demo vendors
         const vendorsSnapshot = await getDocs(collection(db, "vendors"));
         if (vendorsSnapshot.empty && INITIAL_DB.vendors) {
             console.log("Seeding Demo Vendors to Firebase...");
@@ -289,7 +308,6 @@ export const seedInitialData = async () => {
                 const cleanVendor = sanitizePayload(vendor);
                 await setDoc(doc(db, "vendors", vendor.id), cleanVendor);
                 
-                // Also create user accounts for these vendors so they can login
                 const vendorUser: User = {
                     id: vendor.id,
                     name: vendor.name,
@@ -304,10 +322,7 @@ export const seedInitialData = async () => {
                 await setDoc(doc(db, "users", vendorUser.id), cleanUser);
             }
         }
-
-        // Mark as seeded in this browser
         localStorage.setItem('app_seeded_v8', 'true');
-
     } catch (error) {
         console.error("Error seeding initial data:", error);
     }

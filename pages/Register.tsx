@@ -6,6 +6,7 @@ import { Button, Input, ImageCropper } from '../components/UI';
 import { useAppContext } from '../App';
 import { UserType, CATEGORIES } from '../types';
 import { uploadImageToFirebase } from '../services/firebaseService';
+import { ALLOWED_NEIGHBORHOODS } from '../config';
 
 export const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -115,7 +116,7 @@ export const Register: React.FC = () => {
     
     // Validation
     if (!name || !email || !street || !neighborhood || !password) {
-        alert("Preencha todos os campos obrigatórios.");
+        alert("Preencha todos os campos obrigatórios e selecione o bairro.");
         return;
     }
 
@@ -278,7 +279,8 @@ export const Register: React.FC = () => {
                     showPhone,
                     showAddress,
                     showWebsite
-                }
+                },
+                subtype: vendorSubtype // Save subtype to differentiate in Admin Panel
             };
             
             // Add as vendor AND as a login user
@@ -362,6 +364,7 @@ export const Register: React.FC = () => {
                 {state.currentUser ? "Cadastrar Negócio" : "Crie sua conta"}
             </h1>
             <p className="text-gray-500">Faça parte do O Que Tem Perto?</p>
+            <p className="text-xs text-sky-600 font-bold mt-1">Região do Águas Claras</p>
         </div>
 
         {/* Top Tabs - Only show if user NOT logged in */}
@@ -534,7 +537,7 @@ export const Register: React.FC = () => {
                 {/* ADDRESS SECTION - SEPARATED */}
                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4 mt-2">
                     <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                        <MapPin size={16} /> Endereço em Campo Largo
+                        <MapPin size={16} /> Endereço Local
                     </h4>
                     
                     <Input 
@@ -554,14 +557,20 @@ export const Register: React.FC = () => {
                             onChange={e => setNumber(e.target.value)} 
                             className="bg-white"
                         />
-                        <Input 
-                            label="Bairro" 
-                            placeholder="Ex: Centro" 
-                            value={neighborhood} 
-                            onChange={e => setNeighborhood(e.target.value)} 
-                            required 
-                            className="bg-white"
-                        />
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
+                            <select 
+                                value={neighborhood} 
+                                onChange={e => setNeighborhood(e.target.value)} 
+                                required 
+                                className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-primary"
+                            >
+                                <option value="">Selecione...</option>
+                                {ALLOWED_NEIGHBORHOODS.map(n => (
+                                    <option key={n} value={n}>{n}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                     
                     <div className="flex items-center gap-2 mt-2 text-sky-700 text-xs font-medium">

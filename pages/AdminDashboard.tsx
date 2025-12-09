@@ -5,6 +5,8 @@ import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBa
 import { useAppContext } from '../App';
 import { Button, Input, Modal, TwoFactorModal } from '../components/UI';
 import { UserType, User as IUser, Vendor } from '../types';
+import { subscribeToUsers } from '../services/firebaseService';
+import { APP_CONFIG } from '../config';
 
 export const AdminDashboard: React.FC = () => {
   const { state, dispatch } = useAppContext();
@@ -47,6 +49,16 @@ export const AdminDashboard: React.FC = () => {
   
   // Copy State
   const [copied, setCopied] = useState(false);
+
+  // FETCH USERS ONLY WHEN ADMIN DASHBOARD MOUNTS
+  // This solves the scalability issue of downloading everyone at app startup
+  useEffect(() => {
+      console.log("Admin Dashboard: Subscribing to user list...");
+      const unsubscribe = subscribeToUsers((users) => {
+          dispatch({ type: 'SET_USERS', payload: users });
+      });
+      return () => unsubscribe();
+  }, [dispatch]);
 
   // Define on2FASuccess handler
   const on2FASuccess = () => {
@@ -127,10 +139,6 @@ export const AdminDashboard: React.FC = () => {
   const handleSendResetLink = async (targetUser: IUser) => {
       if (!confirm(`Enviar link de redefinição de senha para ${targetUser.email}?`)) return;
 
-      const serviceID = 'service_dqxdi2a';
-      const templateID = 'template_8cthxoh';
-      const publicKey = 'NJZigwymrvB_gdLNP'; 
-      
       // Construct the reset link
       const resetLink = `${window.location.href.split('#')[0]}#/reset-password?id=${targetUser.id}`;
 
@@ -149,7 +157,7 @@ export const AdminDashboard: React.FC = () => {
 
       try {
           // @ts-ignore
-          await window.emailjs.send(serviceID, templateID, templateParams, publicKey);
+          await window.emailjs.send(APP_CONFIG.EMAILJS.SERVICE_ID, APP_CONFIG.EMAILJS.TEMPLATE_ID, templateParams, APP_CONFIG.EMAILJS.PUBLIC_KEY);
           alert(`Link enviado com sucesso para ${targetUser.email}.`);
           dispatch({ 
             type: 'ADD_SECURITY_LOG', 
@@ -157,7 +165,7 @@ export const AdminDashboard: React.FC = () => {
           });
       } catch (error) {
           console.error("Erro email:", error);
-          alert("Erro ao enviar o e-mail. Verifique o console.");
+          alert("Erro ao enviar o e-mail. Verifique se o serviço está configurado.");
       }
   };
 
@@ -178,19 +186,18 @@ export const AdminDashboard: React.FC = () => {
           const isEditingSelf = state.currentUser?.id === editingItem.id;
           
           // 1. Proteger usuário Master de edições externas, mas permitir que ele se edite
-          if (editingItem.email === 'crinf.informatica@gmail.com' && !isEditingSelf) {
+          if (editingItem.email === APP_CONFIG.EMAILJS.ADMIN_EMAIL && !isEditingSelf) {
               alert("Não é permitido alterar o usuário Master.");
               return;
           }
 
-          // 2. Validação de Email Duplicado (Se o e-mail foi alterado)
+          // 2. Validação de Email Duplicado
           if (editEmail !== editingItem.email) {
               const emailExists = state.users.some(u => u.email.toLowerCase() === editEmail.toLowerCase() && u.id !== editingItem.id);
               if (emailExists) {
                   alert("Erro: Este e-mail já está cadastrado para outro usuário.");
                   return;
               }
-              // Confirmação de segurança ao alterar e-mail
               if (!confirm(`ATENÇÃO: Você está alterando o e-mail de login de ${editingItem.name}.\n\nDe: ${editingItem.email}\nPara: ${editEmail}\n\nO usuário precisará usar o NOVO e-mail para entrar. Continuar?`)) {
                   return;
               }
@@ -264,7 +271,6 @@ export const AdminDashboard: React.FC = () => {
           return;
       }
 
-      // Wrap the action in a closure for the 2FA modal
       const executeChange = () => {
           if(!state.currentUser) return;
           dispatch({ 
@@ -306,7 +312,6 @@ export const AdminDashboard: React.FC = () => {
               await navigator.clipboard.writeText(url);
               setCopied(true);
           } else {
-              // Fallback for older browsers or insecure contexts
               const textArea = document.createElement("textarea");
               textArea.value = url;
               document.body.appendChild(textArea);
@@ -317,7 +322,7 @@ export const AdminDashboard: React.FC = () => {
                   setCopied(true);
               } catch (err) {
                   console.error('Fallback copy failed', err);
-                  alert('Não foi possível copiar automaticamente. Selecione e copie o link acima.');
+                  alert('Não foi possível copiar. Selecione e copie o link acima.');
               }
               document.body.removeChild(textArea);
           }
@@ -329,10 +334,9 @@ export const AdminDashboard: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
   };
 
-  // Native Share Function
   const handleNativeShare = async () => {
       const shareData = {
-          title: 'O Que Tem Perto?',
+          title: APP_CONFIG.NAME,
           text: 'Gerencie ou acesse o aplicativo O Que Tem Perto.',
           url: window.location.href.split('#')[0]
       };
@@ -344,15 +348,12 @@ export const AdminDashboard: React.FC = () => {
               console.log('Error sharing', err);
           }
       } else {
-          // Fallback to manual copy if native share not supported
           copyLink();
-          alert('Compartilhamento nativo não suportado neste navegador. Link copiado!');
+          alert('Compartilhamento nativo não suportado. Link copiado!');
       }
   };
 
   const isMaster = state.currentUser?.type === UserType.MASTER;
-  
-  // Filter Locked Users
   const lockedUsers = state.users.filter(u => u.lockedUntil && u.lockedUntil > Date.now());
 
   return (
@@ -372,7 +373,7 @@ export const AdminDashboard: React.FC = () => {
             {[
                 { id: 'users', icon: User, label: 'Usuários' },
                 { id: 'vendors', icon: Store, label: 'Comércios' },
-                { id: 'blocked', icon: Lock, label: 'Bloqueados' }, // New Tab
+                { id: 'blocked', icon: Lock, label: 'Bloqueados' },
                 { id: 'banned', icon: Ban, label: 'Banidos' },
                 { id: 'security', icon: ShieldAlert, label: 'Segurança' },
                 { id: 'distribute', icon: Share2, label: 'Distribuição' }
@@ -389,7 +390,6 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 shadow-inner">
-        
         {/* USERS TAB */}
         {activeTab === 'users' && (
             <div className="space-y-4 animate-fade-in">
@@ -399,10 +399,9 @@ export const AdminDashboard: React.FC = () => {
                         <Plus size={14} /> Novo
                     </Button>
                 </div>
-
                 <div className="space-y-3">
                     {state.users.map(user => {
-                        const isMasterUser = user.email === 'crinf.informatica@gmail.com';
+                        const isMasterUser = user.email === APP_CONFIG.EMAILJS.ADMIN_EMAIL;
                         const canEdit = !isMasterUser || (isMasterUser && state.currentUser?.id === user.id);
                         const isLocked = user.lockedUntil && user.lockedUntil > Date.now();
 
@@ -425,7 +424,6 @@ export const AdminDashboard: React.FC = () => {
                             
                             <div className="flex gap-2 justify-end">
                                 {isMaster && !isMasterUser && (
-                                    // Key Icon now sends Link instead of hard reset
                                     <button onClick={() => handleSendResetLink(user)} className="p-1.5 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100" title="Enviar Link de Senha"><Mail size={14} /></button>
                                 )}
                                 {canEdit && (
@@ -444,11 +442,10 @@ export const AdminDashboard: React.FC = () => {
             </div>
         )}
 
-        {/* LOCKED USERS TAB (NEW) */}
+        {/* LOCKED USERS TAB */}
         {activeTab === 'blocked' && (
              <div className="space-y-4 animate-fade-in">
-                <h3 className="font-bold text-gray-700">Usuários Bloqueados (Senha Incorreta)</h3>
-                
+                <h3 className="font-bold text-gray-700">Usuários Bloqueados</h3>
                 {lockedUsers.length === 0 ? (
                     <div className="text-center py-6 bg-white rounded-xl border border-dashed border-gray-300">
                         <Check className="mx-auto text-green-500 mb-1" size={24} />
@@ -463,13 +460,7 @@ export const AdminDashboard: React.FC = () => {
                                     <p className="text-xs text-red-600">{user.email}</p>
                                     <p className="text-[10px] text-gray-500 mt-1">Tentativas Falhas: {user.failedLoginAttempts}</p>
                                 </div>
-                                <Button 
-                                    onClick={() => handleUnlockUser(user.id)} 
-                                    className="py-1 px-3 text-xs h-auto bg-green-600 hover:bg-green-700 shadow-none"
-                                    icon={<Unlock size={14} />}
-                                >
-                                    Desbloquear
-                                </Button>
+                                <Button onClick={() => handleUnlockUser(user.id)} className="py-1 px-3 text-xs h-auto bg-green-600 hover:bg-green-700 shadow-none" icon={<Unlock size={14} />}>Desbloquear</Button>
                             </div>
                         ))}
                     </div>
@@ -488,19 +479,10 @@ export const AdminDashboard: React.FC = () => {
                                 <img src={vendor.photoUrl} alt={vendor.name} className="w-10 h-10 rounded-lg object-cover bg-gray-100" />
                                 <div>
                                     <h3 className="font-bold text-sm text-gray-800 line-clamp-1">{vendor.name}</h3>
-                                    <span className="text-[10px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full font-bold border border-sky-100">
-                                        {vendor.categories[0]}
-                                    </span>
+                                    <span className="text-[10px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full font-bold border border-sky-100">{vendor.categories[0]}</span>
                                 </div>
                             </div>
-                            
                             <div className="flex gap-2 justify-end border-t border-gray-50 pt-2">
-                                {isMaster && (
-                                    <button onClick={() => {
-                                        const linkedUser = state.users.find(u => u.id === vendor.id);
-                                        if (linkedUser) handleSendResetLink(linkedUser);
-                                    }} className="p-1.5 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100" title="Enviar Link de Senha"><Mail size={14} /></button>
-                                )}
                                 <button onClick={() => openEditModal(vendor, 'vendor')} className="flex-1 py-1 bg-blue-50 text-blue-700 rounded text-[10px] font-bold hover:bg-blue-100 flex items-center justify-center gap-1"><Edit2 size={12} /> Editar</button>
                                 <button onClick={() => handleBan(vendor, 'vendor')} className="flex-1 py-1 bg-orange-50 text-orange-700 rounded text-[10px] font-bold hover:bg-orange-100 flex items-center justify-center gap-1"><Ban size={12} /> Banir</button>
                                 <button onClick={() => handleDelete(vendor.id, 'vendor')} className="px-3 bg-red-50 text-red-700 rounded text-[10px] font-bold hover:bg-red-100"><Trash2 size={12} /></button>
@@ -516,11 +498,8 @@ export const AdminDashboard: React.FC = () => {
              <div className="space-y-4 animate-fade-in">
                 <div className="flex justify-between items-center">
                     <h3 className="font-bold text-gray-700">Banimentos</h3>
-                    <Button onClick={() => setBanModalOpen(true)} variant="danger" className="py-1 px-3 text-xs h-auto gap-1">
-                        <Gavel size={14} /> Novo
-                    </Button>
+                    <Button onClick={() => setBanModalOpen(true)} variant="danger" className="py-1 px-3 text-xs h-auto gap-1"><Gavel size={14} /> Novo</Button>
                 </div>
-
                 {state.bannedDocuments.length === 0 ? (
                     <div className="text-center py-6 bg-white rounded-xl border border-dashed border-gray-300">
                         <Check className="mx-auto text-green-500 mb-1" size={24} />
@@ -531,12 +510,7 @@ export const AdminDashboard: React.FC = () => {
                         {state.bannedDocuments.map((doc, idx) => (
                             <div key={idx} className="p-3 flex justify-between items-center">
                                 <span className="font-mono text-xs text-gray-700">{doc}</span>
-                                <button 
-                                    onClick={() => handleUnban(doc)}
-                                    className="text-[10px] font-bold text-green-600 hover:underline border border-green-200 bg-green-50 px-2 py-1 rounded"
-                                >
-                                    Liberar
-                                </button>
+                                <button onClick={() => handleUnban(doc)} className="text-[10px] font-bold text-green-600 hover:underline border border-green-200 bg-green-50 px-2 py-1 rounded">Liberar</button>
                             </div>
                         ))}
                     </div>
@@ -556,7 +530,6 @@ export const AdminDashboard: React.FC = () => {
                         <Button fullWidth onClick={handleMasterPasswordChange} className="py-2 text-sm mt-2">Atualizar</Button>
                     </div>
                 </div>
-
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                      <div className="flex justify-between items-center mb-2">
                         <h3 className="font-bold text-sm text-gray-800">Log de Acessos</h3>
@@ -576,9 +549,7 @@ export const AdminDashboard: React.FC = () => {
                         ) : <p className="text-xs text-gray-400 italic">Vazio.</p>}
                     </div>
                     {isMaster && (
-                         <Button variant="danger" fullWidth className="mt-4 py-2 text-xs" onClick={handleFactoryReset} icon={<Database size={14} />}>
-                             Resetar Banco de Dados
-                         </Button>
+                         <Button variant="danger" fullWidth className="mt-4 py-2 text-xs" onClick={handleFactoryReset} icon={<Database size={14} />}>Resetar Banco de Dados</Button>
                      )}
                 </div>
             </div>
@@ -596,40 +567,28 @@ export const AdminDashboard: React.FC = () => {
                         Faça upload dos arquivos para um repositório GitHub e ative o <strong>Pages</strong> na branch main.
                      </div>
                  </div>
-
                  <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                      <h3 className="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2">
                          <Globe size={16} /> Link & Compartilhamento
                      </h3>
-                     
                      <div className="flex gap-2 mb-2">
                          <div className="flex-1 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-xs text-gray-600 truncate font-mono">
                              {window.location.href.split('#')[0]}
                          </div>
-                         <button 
-                             onClick={copyLink} 
-                             className={`px-3 rounded font-bold transition-all text-xs text-white flex items-center gap-1 ${copied ? 'bg-green-500' : 'bg-gray-800'}`}
-                         >
-                             {copied ? <Check size={14} /> : <Copy size={14} />}
-                             {copied ? 'Copiado' : 'Copiar'}
+                         <button onClick={copyLink} className={`px-3 rounded font-bold transition-all text-xs text-white flex items-center gap-1 ${copied ? 'bg-green-500' : 'bg-gray-800'}`}>
+                             {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copiado' : 'Copiar'}
                          </button>
                      </div>
-
                      <div className="grid grid-cols-2 gap-2">
-                         <Button variant="primary" icon={<Smartphone size={14} />} onClick={handleNativeShare} className="py-2 text-xs bg-blue-600 hover:bg-blue-700">
-                             Compartilhar via Sistema
-                         </Button>
+                         <Button variant="primary" icon={<Smartphone size={14} />} onClick={handleNativeShare} className="py-2 text-xs bg-blue-600 hover:bg-blue-700">Compartilhar App</Button>
                          <Button variant="primary" icon={<Share2 size={14} />} onClick={() => {
                                 const text = `Acesse nosso app: ${window.location.href.split('#')[0]}`;
                                 window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-                            }} className="py-2 text-xs bg-green-600 hover:bg-green-700">
-                             WhatsApp
-                         </Button>
+                            }} className="py-2 text-xs bg-green-600 hover:bg-green-700">WhatsApp</Button>
                      </div>
                  </div>
              </div>
         )}
-
       </div>
 
       {/* --- MODALS --- */}
@@ -646,7 +605,7 @@ export const AdminDashboard: React.FC = () => {
                             value={editType} 
                             onChange={(e) => setEditType(e.target.value as UserType)}
                             className="w-full border border-gray-300 rounded-lg p-2"
-                            disabled={editEmail === 'crinf.informatica@gmail.com'}
+                            disabled={editEmail === APP_CONFIG.EMAILJS.ADMIN_EMAIL}
                         >
                             <option value={UserType.USER}>Usuário Comum</option>
                             <option value={UserType.ADMIN}>Administrador</option>
