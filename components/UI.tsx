@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Star, MapPin, Phone, MessageCircle, X, ShieldCheck, Smartphone, Mail, Share2, Copy, Check, ZoomIn, Move, Save, Upload } from 'lucide-react';
+import { Star, MapPin, Phone, MessageCircle, X, ShieldCheck, Smartphone, Mail, Share2, Copy, Check, ZoomIn, Move, Save, Upload, Link as LinkIcon, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import { Vendor } from '../types';
 import { signInWithGoogle } from '../services/firebaseService';
 
@@ -51,6 +51,127 @@ export const Button: React.FC<ButtonProps> = ({
       {children}
     </button>
   );
+};
+
+// --- Photo Selector Component ---
+interface PhotoSelectorProps {
+    currentPhotoUrl?: string | null;
+    onPhotoSelected: (data: string) => void; // Returns Base64 or URL
+    label?: string;
+}
+
+export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, onPhotoSelected, label = "Foto" }) => {
+    const [mode, setMode] = useState<'UPLOAD' | 'URL'>('UPLOAD');
+    const [preview, setPreview] = useState<string | null>(currentPhotoUrl || null);
+    const [urlInput, setUrlInput] = useState('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        setPreview(currentPhotoUrl || null);
+    }, [currentPhotoUrl]);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                alert("Aviso: A imagem é maior que 5MB. Por favor, escolha uma menor.");
+                e.target.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const res = reader.result as string;
+                setPreview(res);
+                onPhotoSelected(res);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleUrlBlur = () => {
+        if (urlInput) {
+            setPreview(urlInput);
+            onPhotoSelected(urlInput);
+        }
+    };
+
+    return (
+        <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
+            
+            <div className="flex bg-gray-100 p-1 rounded-lg mb-3">
+                <button 
+                    type="button"
+                    onClick={() => setMode('UPLOAD')}
+                    className={`flex-1 py-2 text-xs font-bold rounded-md flex items-center justify-center gap-1 transition-all ${mode === 'UPLOAD' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}
+                >
+                    <Smartphone size={14} /> Dispositivo / Upload
+                </button>
+                <button 
+                    type="button"
+                    onClick={() => setMode('URL')}
+                    className={`flex-1 py-2 text-xs font-bold rounded-md flex items-center justify-center gap-1 transition-all ${mode === 'URL' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}
+                >
+                    <LinkIcon size={14} /> Link da Web
+                </button>
+            </div>
+
+            <div className={`border-2 border-dashed rounded-xl p-4 text-center transition-all relative overflow-hidden bg-gray-50 ${preview ? 'border-primary' : 'border-gray-300'}`}>
+                
+                {preview && (
+                    <div className="mb-3 relative w-32 h-32 mx-auto rounded-lg overflow-hidden border border-gray-200 shadow-sm bg-white">
+                        <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+                        <button 
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setPreview(null);
+                                setUrlInput('');
+                                onPhotoSelected('');
+                            }}
+                            className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full shadow hover:bg-red-600"
+                        >
+                            <X size={12} />
+                        </button>
+                    </div>
+                )}
+
+                {mode === 'UPLOAD' ? (
+                    <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer py-4">
+                        {!preview && <Upload className="mx-auto text-gray-400 mb-2" />}
+                        <p className="text-sm text-gray-600 font-medium">Clique para enviar foto</p>
+                        <p className="text-xs text-gray-400 mt-1">Galeria, Câmera ou Google Fotos</p>
+                        <div className="flex items-center justify-center gap-1 mt-2 text-[10px] text-orange-600 bg-orange-50 inline-block px-2 py-1 rounded">
+                             <AlertCircle size={10} /> Máximo: 5MB
+                        </div>
+                        <input 
+                            ref={fileInputRef} 
+                            type="file" 
+                            className="hidden" 
+                            accept="image/*"
+                            onChange={handleFileChange}
+                        />
+                    </div>
+                ) : (
+                    <div className="py-2">
+                         <div className="flex items-center gap-2 mb-2 justify-center text-xs text-gray-500">
+                             <ImageIcon size={14} />
+                             <span>Cole o link direto da imagem (Google Fotos, Imgur, etc)</span>
+                         </div>
+                         <input 
+                            type="text" 
+                            placeholder="https://exemplo.com/foto.jpg"
+                            value={urlInput}
+                            onChange={(e) => setUrlInput(e.target.value)}
+                            onBlur={handleUrlBlur}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
+                         />
+                         <p className="text-[10px] text-gray-400 mt-2">Dica: Use links diretos que terminem em .jpg ou .png para melhor funcionamento.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 };
 
 // --- Google Login Button ---

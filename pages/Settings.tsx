@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Settings, Edit3, Upload, Heart, Share2, Bell, Moon, Lock, ChevronRight, Copy, Check, LogOut } from 'lucide-react';
 import { useAppContext } from '../App';
-import { Button, Input, Modal, ImageCropper, TwoFactorModal } from '../components/UI';
+import { Button, Input, Modal, ImageCropper, TwoFactorModal, PhotoSelector } from '../components/UI';
 import { UserType as UserEnum, CATEGORIES } from '../types';
 import { uploadImageToFirebase, updateVendorPartial } from '../services/firebaseService';
 import { ALLOWED_NEIGHBORHOODS } from '../config';
@@ -49,7 +49,6 @@ export const SettingsPage: React.FC = () => {
     const [editCategory, setEditCategory] = useState('');
     const [isEditCustomCategory, setIsEditCustomCategory] = useState(false);
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const isAdminOrMaster = state.currentUser?.type === UserEnum.ADMIN || state.currentUser?.type === UserEnum.MASTER;
 
     useEffect(() => {
@@ -157,22 +156,12 @@ export const SettingsPage: React.FC = () => {
         setConfirmPass('');
     };
 
-    const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            if (file.size > 5 * 1024 * 1024) {
-                alert("A foto selecionada é muito grande. O limite máximo é de 5MB.");
-                e.target.value = '';
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImageToCrop(reader.result as string);
-            };
-            reader.readAsDataURL(file);
+    const handlePhotoSelection = (data: string) => {
+        if (data.startsWith('data:')) {
+             setImageToCrop(data);
+        } else {
+             setEditPhoto(data);
         }
-        e.target.value = '';
     };
 
     const handleCropComplete = (croppedBase64: string) => {
@@ -478,32 +467,11 @@ export const SettingsPage: React.FC = () => {
                      )}
                      
                      <div className="mb-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Alterar Foto</label>
-                        <div className="flex gap-2 items-center">
-                            <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex-shrink-0">
-                                {editPhoto ? (
-                                    <img src={editPhoto} className="w-full h-full object-cover" alt="Prev" />
-                                ) : (
-                                    <User className="w-full h-full p-4 text-gray-300" />
-                                )}
-                            </div>
-                            <div className="flex-1">
-                                <button 
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="w-full py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 flex items-center justify-center gap-2"
-                                >
-                                    <Upload size={16} /> Carregar e Ajustar
-                                </button>
-                                <input 
-                                    ref={fileInputRef} 
-                                    type="file" 
-                                    className="hidden" 
-                                    accept="image/*"
-                                    onChange={handlePhotoFileChange}
-                                />
-                                <p className="text-[10px] text-gray-400 mt-1 text-center">Tamanho máximo: 5MB</p>
-                            </div>
-                        </div>
+                         <PhotoSelector 
+                            label="Alterar Foto"
+                            currentPhotoUrl={editPhoto}
+                            onPhotoSelected={handlePhotoSelection}
+                         />
                      </div>
                      
                      <Button fullWidth onClick={handleSaveProfile} disabled={isSaving}>

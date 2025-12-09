@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, User, Store, Upload, X, MapPin, Briefcase, ShoppingBag, Search } from 'lucide-react';
-import { Button, Input, ImageCropper } from '../components/UI';
+import { Button, Input, ImageCropper, PhotoSelector } from '../components/UI';
 import { useAppContext } from '../App';
 import { UserType, CATEGORIES } from '../types';
 import { uploadImageToFirebase } from '../services/firebaseService';
@@ -53,7 +53,6 @@ export const Register: React.FC = () => {
   // Photo State
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Social Link State
   const [linkType, setLinkType] = useState('Instagram');
@@ -155,37 +154,19 @@ export const Register: React.FC = () => {
       }
   };
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-          alert("A foto selecionada é muito grande. O limite máximo é de 5MB.");
-          e.target.value = '';
-          return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImageToCrop(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+  const handlePhotoSelection = (data: string) => {
+    // If it's a data URL (base64) from upload, maybe crop it
+    if (data.startsWith('data:')) {
+         setImageToCrop(data);
+    } else {
+         // Direct URL (from external link)
+         setPhotoPreview(data);
     }
-    // Reset file input to allow same file selection again
-    e.target.value = '';
   };
 
   const handleCropComplete = (croppedBase64: string) => {
       setPhotoPreview(croppedBase64);
       setImageToCrop(null);
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
-  const removePhoto = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setPhotoPreview(null);
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -326,13 +307,19 @@ export const Register: React.FC = () => {
             // Upload Photo for Vendor
             let finalPhotoUrl = `https://placehold.co/400x300/e0f2fe/1e3a8a?text=Sem+Foto&font=roboto`; 
             
-            if (photoPreview && photoPreview.startsWith('data:')) {
-                try {
-                    setRegisterStatus("Enviando foto da loja...");
-                    finalPhotoUrl = await uploadImageToFirebase(photoPreview, `vendors/${newId}/cover.jpg`);
-                } catch(e) {
-                    console.error("Foto upload fail", e);
-                    alert("Aviso: Falha ao enviar a foto. Usando imagem padrão.");
+            // Handle Photo: If data URI (new upload) -> upload to Firebase. If URL -> use as is.
+            if (photoPreview) {
+                if (photoPreview.startsWith('data:')) {
+                    try {
+                        setRegisterStatus("Enviando foto da loja...");
+                        finalPhotoUrl = await uploadImageToFirebase(photoPreview, `vendors/${newId}/cover.jpg`);
+                    } catch(e) {
+                        console.error("Foto upload fail", e);
+                        alert("Aviso: Falha ao enviar a foto. Usando imagem padrão.");
+                    }
+                } else {
+                    // It's a direct URL (from web/Google Photos)
+                    finalPhotoUrl = photoPreview;
                 }
             } else if (isGoogleRegister && photoPreview) {
                  finalPhotoUrl = photoPreview;
@@ -718,62 +705,22 @@ export const Register: React.FC = () => {
                         <Input label="Descrição Curta" placeholder="Descreva seus serviços ou produtos..." multiline value={description} onChange={e => setDescription(e.target.value)} />
                         
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Foto do Local ou Perfil</label>
-                            <div 
-                                onClick={triggerFileInput}
-                                className={`border-2 border-dashed rounded-lg p-2 text-center cursor-pointer transition-all relative overflow-hidden h-40 flex flex-col items-center justify-center ${photoPreview ? 'border-primary' : 'border-gray-200 hover:bg-gray-50'}`}
-                            >
-                                {photoPreview ? (
-                                    <>
-                                        <img src={photoPreview} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
-                                        <button 
-                                            onClick={removePhoto}
-                                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow hover:bg-red-600 z-10"
-                                        >
-                                            <X size={16} />
-                                        </button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Upload className="mx-auto text-gray-400 mb-2" />
-                                        <span className="text-sm text-gray-500 block">Clique para enviar e ajustar</span>
-                                        <span className="text-xs text-gray-400 block mt-1">(JPG, PNG - Máx 5MB)</span>
-                                    </>
-                                )}
-                                <input 
-                                    ref={fileInputRef} 
-                                    type="file" 
-                                    className="hidden" 
-                                    accept="image/*"
-                                    onChange={handlePhotoChange}
-                                />
-                            </div>
+                            <PhotoSelector 
+                                label="Foto do Local ou Capa"
+                                currentPhotoUrl={photoPreview}
+                                onPhotoSelected={handlePhotoSelection}
+                            />
                         </div>
                     </>
                 )}
                 
                 {activeTab === UserType.USER && (
                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Foto de Perfil (Opcional)</label>
-                        <div 
-                            onClick={triggerFileInput}
-                            className={`border-2 border-dashed rounded-lg p-2 text-center cursor-pointer transition-all relative overflow-hidden h-24 flex flex-col items-center justify-center ${photoPreview ? 'border-primary' : 'border-gray-200 hover:bg-gray-50'}`}
-                        >
-                            {photoPreview ? (
-                                <>
-                                    <img src={photoPreview} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
-                                    <button onClick={removePhoto} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow z-10"><X size={14} /></button>
-                                </>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center text-gray-400">
-                                    <div className="flex items-center gap-2">
-                                        <Upload size={20} /> <span className="text-sm">Enviar e Ajustar Foto</span>
-                                    </div>
-                                    <span className="text-[10px] mt-1">(Máx 5MB)</span>
-                                </div>
-                            )}
-                            <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handlePhotoChange}/>
-                        </div>
+                        <PhotoSelector 
+                            label="Foto de Perfil (Opcional)"
+                            currentPhotoUrl={photoPreview}
+                            onPhotoSelected={handlePhotoSelection}
+                        />
                      </div>
                 )}
 
