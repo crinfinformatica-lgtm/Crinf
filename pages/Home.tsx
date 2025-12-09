@@ -7,55 +7,44 @@ import { VendorCard, Button } from '../components/UI';
 import { useAppContext } from '../App';
 import { interpretSearchQuery } from '../services/geminiService';
 
-// Custom Logo Component - Replica of the provided image "O QUE TEM PERTO?"
+// Updated AppLogo - Yellow Gear + Wrench Tool, Text on Top
 const AppLogo = () => (
   <svg viewBox="0 0 200 200" className="w-64 h-64 drop-shadow-xl animate-fade-in">
-    <defs>
-      <path id="curveTop" d="M 24,100 A 76,76 0 0,1 176,100" />
-    </defs>
-    
-    {/* Outer Border Circle */}
-    <circle cx="100" cy="100" r="98" fill="#1e3a8a" /> 
-
-    {/* Top Half - Blue */}
-    <path d="M 5,100 A 95,95 0 0,1 195,100 L 195,100 L 5,100 Z" fill="#60a5fa" />
-    
-    {/* Bottom Half - Yellow */}
-    <path d="M 5,100 A 95,95 0 0,0 195,100 L 195,100 L 5,100 Z" fill="#fcd34d" />
-    
-    {/* Horizontal Divider Line */}
-    <line x1="5" y1="100" x2="195" y2="100" stroke="#1e3a8a" strokeWidth="3" />
-
-    {/* Top Text - Curved */}
-    <text width="200" textAnchor="middle" fontSize="16" fontWeight="900" fill="white" letterSpacing="2" style={{ fontFamily: 'Arial Black, sans-serif' }}>
-       <textPath href="#curveTop" startOffset="50%" textAnchor="middle">
-         O QUE TEM PERTO?
-       </textPath>
+    {/* TEXT ON TOP */}
+    <text x="100" y="35" textAnchor="middle" fontSize="14" fontWeight="900" fill="#0c4a6e" letterSpacing="1" style={{ fontFamily: 'Inter, sans-serif' }}>
+        O QUE TEM PERTO?
     </text>
 
-    {/* Center Graphic */}
-    <g transform="translate(100, 95)">
-       {/* "AC" Text - Now Uppercase */}
-       <text x="0" y="25" textAnchor="middle" fontSize="65" fontWeight="900" fill="white" stroke="#1e3a8a" strokeWidth="2.5" style={{ fontFamily: 'Arial, sans-serif' }}>
-         AC
-       </text>
-    </g>
-
-    {/* Bottom Text - City */}
-    <text x="100" y="138" textAnchor="middle" fontSize="11" fontWeight="800" fill="#1e3a8a" letterSpacing="0.5">
-        ÁGUAS CLARAS E REGIÃO
-    </text>
-
-    {/* Bottom Icons - Unified Store/Service Icon */}
-    <g transform="translate(100, 165)" fill="none" stroke="#1e3a8a" strokeWidth="2">
-        {/* Awning */}
-        <path d="M -18,-6 L 18,-6 L 14,-14 L -14,-14 Z" strokeLinejoin="round" fill="#60a5fa" fillOpacity="0.3" />
-        {/* Building Base */}
-        <rect x="-14" y="-6" width="28" height="14" fill="white" fillOpacity="0.2" />
-        {/* Door */}
-        <rect x="-4" y="1" width="8" height="7" />
-        {/* Details on Awning */}
-        <path d="M -7,-14 L -9,-6 M 0,-14 L 0,-6 M 7,-14 L 9,-6" opacity="0.5" />
+    {/* Container Circle (Moved Down) */}
+    <circle cx="100" cy="115" r="75" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="4" />
+    
+    {/* Yellow Gear Icon */}
+    <path 
+        d="M135 115 C135 134.3 119.3 150 100 150 C80.7 150 65 134.3 65 115 C65 95.7 80.7 80 100 80 C119.3 80 135 95.7 135 115 Z M100 90 C113.8 90 125 101.2 125 115 C125 128.8 113.8 140 100 140 C86.2 140 75 128.8 75 115 C75 101.2 86.2 90 100 90 Z" 
+        fill="#facc15" 
+        stroke="#facc15" 
+        strokeWidth="10"
+        strokeLinecap="round"
+        strokeDasharray="10 15"
+    />
+    
+    {/* Wrench (Tool) Overlay - Dark Blue */}
+    <g transform="translate(100, 115) rotate(45)">
+         <path 
+            d="M-8 0 L-8 40 L8 40 L8 0" 
+            fill="#0c4a6e" 
+            transform="translate(0, 5)"
+         />
+         <path 
+            d="M-15 -15 C-15 -25 15 -25 15 -15 L15 0 L-15 0 Z" 
+            fill="#0c4a6e"
+            transform="translate(0, -10)"
+         />
+         {/* Wrench Head */}
+         <path
+            d="M-20 -25 C-25 -35 -10 -45 0 -45 C10 -45 25 -35 20 -25 L15 -15 L-15 -15 Z"
+            fill="#0c4a6e"
+         />
     </g>
   </svg>
 );
@@ -149,7 +138,7 @@ export const Home: React.FC = () => {
 
             <div className="z-10 w-full flex flex-col items-center text-center">
                 {/* Logo Area */}
-                <div className="mb-4 transform hover:scale-105 transition-transform duration-500">
+                <div className="mb-8 transform hover:scale-105 transition-transform duration-500">
                     <AppLogo />
                 </div>
                 

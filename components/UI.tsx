@@ -671,55 +671,66 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
   );
 };
 
-// --- App Logo ---
+// --- NEW APP LOGO (Yellow Gear + Tool) ---
 export const AppLogo = () => (
   <svg viewBox="0 0 200 200" className="w-64 h-64 drop-shadow-xl animate-fade-in">
-    <defs>
-      <path id="curveTop" d="M 24,100 A 76,76 0 0,1 176,100" />
-    </defs>
-    <circle cx="100" cy="100" r="98" fill="#1e3a8a" /> 
-    <path d="M 5,100 A 95,95 0 0,1 195,100 L 195,100 L 5,100 Z" fill="#60a5fa" />
-    <path d="M 5,100 A 95,95 0 0,0 195,100 L 195,100 L 5,100 Z" fill="#fcd34d" />
-    <line x1="5" y1="100" x2="195" y2="100" stroke="#1e3a8a" strokeWidth="3" />
-    <text width="200" textAnchor="middle" fontSize="16" fontWeight="900" fill="white" letterSpacing="2" style={{ fontFamily: 'Arial Black, sans-serif' }}>
-       <textPath href="#curveTop" startOffset="50%" textAnchor="middle">
-         O QUE TEM PERTO?
-       </textPath>
+    {/* TEXT ON TOP */}
+    <text x="100" y="35" textAnchor="middle" fontSize="14" fontWeight="900" fill="#0c4a6e" letterSpacing="1" style={{ fontFamily: 'Inter, sans-serif' }}>
+        O QUE TEM PERTO?
     </text>
-    <g transform="translate(100, 95)">
-       <text x="0" y="25" textAnchor="middle" fontSize="65" fontWeight="900" fill="white" stroke="#1e3a8a" strokeWidth="2.5" style={{ fontFamily: 'Arial, sans-serif' }}>
-         AC
-       </text>
-    </g>
-    <text x="100" y="138" textAnchor="middle" fontSize="11" fontWeight="800" fill="#1e3a8a" letterSpacing="0.5">
-        ÁGUAS CLARAS E REGIÃO
-    </text>
-    <g transform="translate(100, 165)" fill="none" stroke="#1e3a8a" strokeWidth="2">
-        <path d="M -18,-6 L 18,-6 L 14,-14 L -14,-14 Z" strokeLinejoin="round" fill="#60a5fa" fillOpacity="0.3" />
-        <rect x="-14" y="-6" width="28" height="14" fill="white" fillOpacity="0.2" />
-        <rect x="-4" y="1" width="8" height="7" />
-        <path d="M -7,-14 L -9,-6 M 0,-14 L 0,-6 M 7,-14 L 9,-6" opacity="0.5" />
+
+    {/* Container Circle (Moved Down) */}
+    <circle cx="100" cy="115" r="75" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="4" />
+    
+    {/* Yellow Gear Icon */}
+    <path 
+        d="M135 115 C135 134.3 119.3 150 100 150 C80.7 150 65 134.3 65 115 C65 95.7 80.7 80 100 80 C119.3 80 135 95.7 135 115 Z M100 90 C113.8 90 125 101.2 125 115 C125 128.8 113.8 140 100 140 C86.2 140 75 128.8 75 115 C75 101.2 86.2 90 100 90 Z" 
+        fill="#facc15" 
+        stroke="#facc15" 
+        strokeWidth="10"
+        strokeLinecap="round"
+        strokeDasharray="10 15"
+    />
+    
+    {/* Wrench (Tool) Overlay - Dark Blue */}
+    <g transform="translate(100, 115) rotate(45)">
+         <path 
+            d="M-8 0 L-8 40 L8 40 L8 0" 
+            fill="#0c4a6e" 
+            transform="translate(0, 5)"
+         />
+         <path 
+            d="M-15 -15 C-15 -25 15 -25 15 -15 L15 0 L-15 0 Z" 
+            fill="#0c4a6e"
+            transform="translate(0, -10)"
+         />
+         {/* Wrench Head */}
+         <path
+            d="M-20 -25 C-25 -35 -10 -45 0 -45 C10 -45 25 -35 20 -25 L15 -15 L-15 -15 Z"
+            fill="#0c4a6e"
+         />
     </g>
   </svg>
 );
 
-// --- Admin Logo ---
+// --- NEW ADMIN LOGO (Aligned Style) ---
 export const AdminLogo = () => (
     <svg width="60" height="60" viewBox="0 0 100 100" className="animate-fade-in drop-shadow-md">
-        <defs>
-            <linearGradient id="adminGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#1e293b" />
-                <stop offset="100%" stopColor="#0f172a" />
-            </linearGradient>
-        </defs>
-        <rect x="10" y="20" width="80" height="60" rx="10" fill="url(#adminGrad)" stroke="#38bdf8" strokeWidth="2" />
-        <rect x="15" y="25" width="70" height="50" rx="5" fill="#0f172a" opacity="0.8" />
-        <path d="M 25,60 A 15,15 0 0,1 55,60" fill="none" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" />
-        <line x1="40" y1="60" x2="40" y2="45" stroke="#f43f5e" strokeWidth="2" />
-        <rect x="65" y="45" width="5" height="15" fill="#4ade80" />
-        <rect x="73" y="35" width="5" height="25" fill="#fbbf24" />
-        <circle cx="85" cy="15" r="12" fill="#38bdf8" stroke="#0f172a" strokeWidth="3" />
-        <circle cx="85" cy="15" r="4" fill="#0f172a" />
-        <path d="M 30,80 L 20,95 L 80,95 L 70,80 Z" fill="#334155" />
+        <circle cx="50" cy="50" r="45" fill="#1e293b" stroke="#38bdf8" strokeWidth="2" />
+        <path 
+          d="M50 20 C 35 20 25 32 25 45 C 25 65 50 90 50 90 C 50 90 75 65 75 45 C 75 32 65 20 50 20 Z" 
+          fill="#38bdf8" 
+        />
+        <path 
+            d="M 40 40 L 40 55 C 40 56 41 57 42 57 L 58 57 C 59 57 60 56 60 55 L 60 40 L 40 40 Z" 
+            fill="#1e293b" 
+        />
+        <path 
+            d="M 42 40 L 42 38 C 42 34 58 34 58 38 L 58 40" 
+            fill="none" 
+            stroke="#1e293b" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+        />
     </svg>
 );
