@@ -671,45 +671,73 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
   );
 };
 
-// --- NEW APP LOGO (Yellow Gear + Tool) ---
+// --- NEW APP LOGO (Yellow Wrench + Shop + GUIA text) ---
 export const AppLogo = () => (
-  <svg viewBox="0 0 200 200" className="w-64 h-64 drop-shadow-xl animate-fade-in">
-    {/* TEXT ON TOP */}
-    <text x="100" y="35" textAnchor="middle" fontSize="14" fontWeight="900" fill="#0c4a6e" letterSpacing="1" style={{ fontFamily: 'Inter, sans-serif' }}>
-        O QUE TEM PERTO?
-    </text>
+  <svg viewBox="0 0 200 160" className="w-64 h-64 drop-shadow-xl animate-fade-in">
+    <defs>
+      <linearGradient id="goldGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stopColor="#facc15" />
+        <stop offset="100%" stopColor="#eab308" />
+      </linearGradient>
+      <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+        <feOffset dx="2" dy="2" result="offsetblur"/>
+        <feComponentTransfer>
+          <feFuncA type="linear" slope="0.3"/>
+        </feComponentTransfer>
+        <feMerge> 
+          <feMergeNode/>
+          <feMergeNode in="SourceGraphic"/> 
+        </feMerge>
+      </filter>
+    </defs>
 
-    {/* Container Circle (Moved Down) */}
-    <circle cx="100" cy="115" r="75" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="4" />
-    
-    {/* Yellow Gear Icon */}
-    <path 
-        d="M135 115 C135 134.3 119.3 150 100 150 C80.7 150 65 134.3 65 115 C65 95.7 80.7 80 100 80 C119.3 80 135 95.7 135 115 Z M100 90 C113.8 90 125 101.2 125 115 C125 128.8 113.8 140 100 140 C86.2 140 75 128.8 75 115 C75 101.2 86.2 90 100 90 Z" 
-        fill="#facc15" 
-        stroke="#facc15" 
-        strokeWidth="10"
-        strokeLinecap="round"
-        strokeDasharray="10 15"
-    />
-    
-    {/* Wrench (Tool) Overlay - Dark Blue */}
-    <g transform="translate(100, 115) rotate(45)">
-         <path 
-            d="M-8 0 L-8 40 L8 40 L8 0" 
-            fill="#0c4a6e" 
-            transform="translate(0, 5)"
-         />
-         <path 
-            d="M-15 -15 C-15 -25 15 -25 15 -15 L15 0 L-15 0 Z" 
-            fill="#0c4a6e"
-            transform="translate(0, -10)"
-         />
-         {/* Wrench Head */}
-         <path
-            d="M-20 -25 C-25 -35 -10 -45 0 -45 C10 -45 25 -35 20 -25 L15 -15 L-15 -15 Z"
-            fill="#0c4a6e"
-         />
+    {/* Group for Icons */}
+    <g transform="translate(100, 60)" filter="url(#dropShadow)">
+        
+        {/* Wrench (Left) - Rotated */}
+        <g transform="translate(-45, -10) rotate(-45)">
+            <path 
+                d="M10 -10 L10 50 C10 58 30 58 30 50 L30 -10 L45 -25 C55 -35 40 -50 30 -40 L20 -30 L10 -40 C0 -50 -15 -35 -5 -25 Z" 
+                fill="url(#goldGradient)" 
+                stroke="#b45309" 
+                strokeWidth="1.5"
+            />
+            {/* Detail line on handle */}
+            <path d="M20 0 L20 40" stroke="#b45309" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
+        </g>
+
+        {/* Shop (Right) */}
+        <g transform="translate(15, -25)">
+            {/* Building Body */}
+            <rect x="0" y="25" width="50" height="40" rx="3" fill="url(#goldGradient)" stroke="#b45309" strokeWidth="1.5" />
+            {/* Door */}
+            <rect x="28" y="40" width="14" height="25" fill="#b45309" rx="1" />
+            {/* Window */}
+            <rect x="8" y="40" width="14" height="14" fill="#fef08a" stroke="#b45309" strokeWidth="1" rx="1" />
+            
+            {/* Awning */}
+            <path d="M-5 25 L55 25 L50 5 L0 5 Z" fill="url(#goldGradient)" stroke="#b45309" strokeWidth="1.5" />
+            {/* Awning Stripes */}
+            <path d="M10 5 L10 25 M20 5 L20 25 M30 5 L30 25 M40 5 L40 25" stroke="#b45309" strokeWidth="1.5" />
+        </g>
     </g>
+
+    {/* TEXT: GUIA */}
+    <text 
+        x="100" 
+        y="140" 
+        textAnchor="middle" 
+        fontSize="48" 
+        fontWeight="900" 
+        fill="url(#goldGradient)" 
+        stroke="#b45309" 
+        strokeWidth="1.5"
+        style={{ fontFamily: 'Arial Black, sans-serif', letterSpacing: '2px' }}
+        filter="url(#dropShadow)"
+    >
+        GUIA
+    </text>
   </svg>
 );
 
