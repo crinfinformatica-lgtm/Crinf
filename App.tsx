@@ -627,10 +627,10 @@ const Login: React.FC = () => {
             <div className="absolute top-[-100px] left-[-100px] w-64 h-64 bg-sky-200 dark:bg-sky-900/30 rounded-full blur-3xl opacity-50"></div>
             <div className="absolute bottom-[-100px] right-[-100px] w-64 h-64 bg-blue-200 dark:bg-blue-900/30 rounded-full blur-3xl opacity-50"></div>
 
-            <div className="w-24 h-24 bg-gradient-to-tr from-sky-400 to-primary rounded-3xl flex items-center justify-center mb-6 shadow-2xl transform rotate-3">
+            <div className="mb-6 w-full flex justify-center transform hover:scale-105 transition-transform">
                 <AppLogo />
             </div>
-            <h1 className="text-3xl font-extrabold text-sky-900 dark:text-sky-400 mb-2 text-center tracking-tight">{APP_CONFIG.NAME}</h1>
+            
             <p className="text-gray-500 dark:text-gray-400 mb-8 text-center font-medium">Acesse sua conta para continuar.</p>
             
             <div className="w-full space-y-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-6 rounded-3xl border border-white dark:border-slate-700 shadow-xl">
