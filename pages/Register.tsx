@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, User, Store, Upload, X, MapPin, Briefcase, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, User, Store, Upload, X, MapPin, Briefcase, ShoppingBag, Search } from 'lucide-react';
 import { Button, Input, ImageCropper } from '../components/UI';
 import { useAppContext } from '../App';
 import { UserType, CATEGORIES } from '../types';
@@ -24,9 +24,12 @@ export const Register: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   
   // Address State (Separated)
+  const [cep, setCep] = useState('');
   const [street, setStreet] = useState('');
   const [number, setNumber] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
+  const [isValidLocation, setIsValidLocation] = useState(false);
+  const [isLoadingCep, setIsLoadingCep] = useState(false);
   
   // User Specific
   const [userCPF, setUserCPF] = useState('');
@@ -78,6 +81,80 @@ export const Register: React.FC = () => {
       }
   }, [location.state]);
 
+  const normalizeString = (str: string) => {
+      return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  };
+
+  const handleBlurCep = async () => {
+      const cleanCep = cep.replace(/\D/g, '');
+      if (cleanCep.length !== 8) return;
+
+      setIsLoadingCep(true);
+      try {
+          const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cleanCep}`);
+          if (!response.ok) throw new Error("CEP não encontrado");
+          
+          const data = await response.json();
+          
+          // 1. Validate City
+          if (data.city !== 'Campo Largo') {
+              alert(`O app atende exclusivamente Campo Largo/PR. O CEP informado pertence a ${data.city}.`);
+              setCep('');
+              setStreet('');
+              setNeighborhood('');
+              setIsValidLocation(false);
+              return;
+          }
+
+          // 2. Validate Neighborhood (Fuzzy Match)
+          // Some APIs return "Jardim Esmeralda", others "Jd. Esmeralda". We normalize.
+          const returnedNeighborhood = normalizeString(data.neighborhood || '');
+          
+          // Helper to check if any allowed neighborhood matches the returned one
+          const isAllowed = ALLOWED_NEIGHBORHOODS.some(allowed => {
+              const normAllowed = normalizeString(allowed);
+              // Check if allowed is inside returned OR returned is inside allowed (for variations)
+              return returnedNeighborhood.includes(normAllowed) || normAllowed.includes(returnedNeighborhood);
+          });
+
+          // Special check for "Águas Claras" variations (Distrito, etc)
+          const isAguasClaras = returnedNeighborhood.includes('aguas claras');
+          
+          if (!isAllowed && !isAguasClaras && data.neighborhood) {
+              alert(`O bairro detectado (${data.neighborhood}) não faz parte da região atendida pelo app (Águas Claras e entorno).`);
+              // We don't clear the fields immediately to let user see, but prevent submit
+              setNeighborhood('');
+              setStreet('');
+              setIsValidLocation(false);
+              return;
+          }
+
+          setStreet(data.street || '');
+          // If the API identified the neighborhood correctly as one of the allowed, auto-select it
+          if (isAllowed || isAguasClaras) {
+              const exactMatch = ALLOWED_NEIGHBORHOODS.find(n => normalizeString(n) === returnedNeighborhood) || 
+                                 (isAguasClaras ? "Águas Claras" : "");
+              
+              if (exactMatch) {
+                  setNeighborhood(exactMatch);
+              } else {
+                  // If fuzzy matched but not exact string, try to map to the closest one or let user pick
+                  // For safety, let user pick but validate later
+                  setNeighborhood(''); 
+              }
+          }
+          
+          setIsValidLocation(true);
+
+      } catch (error) {
+          console.error("CEP Error", error);
+          alert("Erro ao buscar CEP. Verifique se os números estão corretos.");
+          setIsValidLocation(false);
+      } finally {
+          setIsLoadingCep(false);
+      }
+  };
+
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -117,6 +194,11 @@ export const Register: React.FC = () => {
     // Validation
     if (!name || !email || !street || !neighborhood || !password) {
         alert("Preencha todos os campos obrigatórios e selecione o bairro.");
+        return;
+    }
+
+    if (!isValidLocation && cep.length === 9) {
+        alert("Por favor, verifique o CEP. O endereço parece estar fora da região permitida.");
         return;
     }
 
@@ -242,8 +324,6 @@ export const Register: React.FC = () => {
             }
             
             // Upload Photo for Vendor
-            // Fallback to a seeded URL to avoid "random dancing images"
-            // Using ID ensures it stays the same for this user
             let finalPhotoUrl = `https://placehold.co/400x300/e0f2fe/1e3a8a?text=Sem+Foto&font=roboto`; 
             
             if (photoPreview && photoPreview.startsWith('data:')) {
@@ -255,7 +335,6 @@ export const Register: React.FC = () => {
                     alert("Aviso: Falha ao enviar a foto. Usando imagem padrão.");
                 }
             } else if (isGoogleRegister && photoPreview) {
-                 // If using Google Photo
                  finalPhotoUrl = photoPreview;
             }
 
@@ -280,13 +359,11 @@ export const Register: React.FC = () => {
                     showAddress,
                     showWebsite
                 },
-                subtype: vendorSubtype // Save subtype to differentiate in Admin Panel
+                subtype: vendorSubtype
             };
             
-            // Add as vendor AND as a login user
             dispatch({ type: 'ADD_VENDOR', payload: newVendor });
             
-            // Create a user entry so they can login
             const vendorUser = {
                 id: newVendor.id, 
                 name: newVendor.name, 
@@ -534,12 +611,43 @@ export const Register: React.FC = () => {
                     </>
                 )}
 
-                {/* ADDRESS SECTION - SEPARATED */}
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4 mt-2">
+                {/* ADDRESS SECTION - SEPARATED & VALIDATED */}
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4 mt-2 relative">
                     <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
                         <MapPin size={16} /> Endereço Local
                     </h4>
                     
+                    {/* CEP FIELD */}
+                    <div className="mb-3 relative">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">CEP (Obrigatório)</label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="83600-000"
+                                value={cep}
+                                onChange={e => {
+                                    const v = e.target.value.replace(/\D/g, '');
+                                    if(v.length <= 8) {
+                                        setCep(v.replace(/^(\d{5})(\d)/, '$1-$2'));
+                                    }
+                                }}
+                                onBlur={handleBlurCep}
+                                className={`w-full px-4 py-2 pr-10 border rounded-lg outline-none focus:ring-2 transition-all ${isValidLocation ? 'border-green-300 focus:ring-green-200 bg-white' : 'border-gray-200 focus:ring-primary'}`}
+                                required
+                            />
+                            <div className="absolute right-3 top-2.5">
+                                {isLoadingCep ? (
+                                    <div className="animate-spin h-5 w-5 border-2 border-gray-300 rounded-full border-t-primary"></div>
+                                ) : isValidLocation ? (
+                                    <Search size={18} className="text-green-500" />
+                                ) : (
+                                    <Search size={18} className="text-gray-400" />
+                                )}
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1">Digite o CEP para validar a região.</p>
+                    </div>
+
                     <Input 
                         label="Rua / Logradouro" 
                         placeholder="Ex: Rua XV de Novembro" 
@@ -547,6 +655,7 @@ export const Register: React.FC = () => {
                         onChange={e => setStreet(e.target.value)} 
                         required 
                         className="bg-white"
+                        readOnly={isValidLocation && street.length > 0} // Lock if found
                     />
                     
                     <div className="grid grid-cols-2 gap-4">
@@ -577,6 +686,12 @@ export const Register: React.FC = () => {
                         <div className="w-2 h-2 rounded-full bg-sky-500"></div>
                         Cidade fixa: <strong>Campo Largo - PR</strong>
                     </div>
+
+                    {!isValidLocation && cep.length === 9 && !isLoadingCep && (
+                        <div className="mt-2 bg-yellow-50 text-yellow-800 text-xs p-2 rounded border border-yellow-200">
+                            <strong>Atenção:</strong> Verifique se o CEP pertence aos bairros atendidos (Águas Claras e Região).
+                        </div>
+                    )}
                 </div>
                 
                 {activeTab === UserType.VENDOR && (
