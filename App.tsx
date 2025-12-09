@@ -551,7 +551,13 @@ const Login: React.FC = () => {
                     return;
                 }
 
-                const storedPass = foundUser.password || '123'; 
+                // FIX: REMOVE UNSAFE FALLBACK TO '123'. STRICT CHECK.
+                const storedPass = foundUser.password;
+
+                if (!storedPass) {
+                    alert("Esta conta foi criada via Login Social (Google) ou não possui senha definida.\n\nPor favor, use o botão 'Entrar com Google' abaixo ou clique em 'Esqueci minha senha' para criar uma.");
+                    return;
+                }
 
                 if (password === storedPass) {
                     await successfulLogin(foundUser); 
@@ -565,7 +571,7 @@ const Login: React.FC = () => {
                     if (attempts && attempts >= 3) {
                         alert("Muitas tentativas incorretas. Sua conta foi bloqueada por 5 minutos.");
                     } else {
-                        alert(`Senha incorreta. Tentativa ${attempts || 1} de 3.`);
+                        alert(`Senha incorreta. Tentativa ${attempts || 1} de 3.\n\nSe você esqueceu sua senha, use a opção 'Esqueci minha senha' abaixo.`);
                     }
                 }
             } else {

@@ -30,22 +30,29 @@ const sanitizePayload = (data: any) => {
     return cleanData;
 };
 
-// Converte Base64 (DataURL) para Blob (Arquivo Binário)
-// Isso resolve problemas de upload de strings longas
+// Converte Base64 (DataURL) para Blob (Arquivo Binário) com tratamento de MIME Type correto
 const dataURLtoBlob = (dataurl: string) => {
-    const arr = dataurl.split(',');
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while(n--){
-        u8arr[n] = bstr.charCodeAt(n);
+    try {
+        const arr = dataurl.split(',');
+        if (arr.length < 2) throw new Error("Formato de imagem inválido.");
+        
+        const mimeMatch = arr[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while(n--){
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new Blob([u8arr], {type: mime});
+    } catch (e) {
+        console.error("Erro na conversão de imagem:", e);
+        throw new Error("Falha ao processar o arquivo de imagem.");
     }
-    return new Blob([u8arr], {type:mime});
 };
 
-// Upload Base64 Image to Firebase Storage with Timeout using uploadBytes (Robust)
+// Upload Base64 Image to Firebase Storage using uploadBytes (Robust)
 export const uploadImageToFirebase = async (base64Data: string, path: string): Promise<string> => {
   if (!base64Data) return '';
   
@@ -53,22 +60,20 @@ export const uploadImageToFirebase = async (base64Data: string, path: string): P
     const storageRef = ref(storage, path);
     const blob = dataURLtoBlob(base64Data); // Converte para arquivo real
 
-    // Create a timeout promise (60 seconds for slower networks)
-    const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Tempo limite excedido (60s). Verifique sua internet.")), 60000)
-    );
+    // Metadata is CRITICAL for browsers to display the file as an image instead of downloading it
+    const metadata = {
+        contentType: blob.type || 'image/jpeg',
+        cacheControl: 'public, max-age=31536000' // Cache for 1 year (performance)
+    };
 
-    // Upload task using uploadBytes (Binary) instead of uploadString
-    const uploadTask = uploadBytes(storageRef, blob);
+    // Upload task using uploadBytes (Binary)
+    await uploadBytes(storageRef, blob, metadata);
 
-    // Race between upload and timeout
-    await Promise.race([uploadTask, timeoutPromise]);
-
+    // Get URL
     const url = await getDownloadURL(storageRef);
     return url;
   } catch (error: any) {
     console.error("Erro upload imagem:", error);
-    // Throw error so UI knows it failed
     throw new Error(error.message || "Falha no upload da imagem."); 
   }
 };
@@ -241,6 +246,7 @@ export const updateAppConfig = async (config: AppConfig) => {
         let finalLogoUrl = config.logoUrl;
         
         if (config.logoUrl && config.logoUrl.startsWith('data:')) {
+             // Unique name is vital to prevent caching
              finalLogoUrl = await uploadImageToFirebase(config.logoUrl, `settings/logo_${Date.now()}.png`);
         }
 
@@ -281,7 +287,7 @@ export const saveUserToFirebase = async (user: User) => {
   try {
     // Check if image is still Base64 (Should be handled by UI, but double check)
     if (user.photoUrl && user.photoUrl.startsWith('data:')) {
-        const url = await uploadImageToFirebase(user.photoUrl, `users/${user.id}/profile.jpg`);
+        const url = await uploadImageToFirebase(user.photoUrl, `users/${user.id}/profile_${Date.now()}.jpg`);
         user.photoUrl = url;
     }
     const cleanUser = sanitizePayload(user);
@@ -296,7 +302,7 @@ export const saveUserToFirebase = async (user: User) => {
 export const saveVendorToFirebase = async (vendor: Vendor) => {
   try {
     if (vendor.photoUrl && vendor.photoUrl.startsWith('data:')) {
-        const url = await uploadImageToFirebase(vendor.photoUrl, `vendors/${vendor.id}/cover.jpg`);
+        const url = await uploadImageToFirebase(vendor.photoUrl, `vendors/${vendor.id}/cover_${Date.now()}.jpg`);
         vendor.photoUrl = url;
     }
     const cleanVendor = sanitizePayload(vendor);

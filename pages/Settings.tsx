@@ -193,8 +193,8 @@ export const SettingsPage: React.FC = () => {
             // We MUST upload first to get the URL. We cannot save Base64 to Firestore (Too big).
             if (editPhoto && editPhoto.startsWith('data:')) {
                 setSavingStatus("Enviando imagem para o servidor...");
+                // Unique name prevents caching issues
                 const fileName = `profile_${Date.now()}.jpg`;
-                // Path depends on user type, but structure is generally safe
                 const path = `users/${state.currentUser.id}/${fileName}`;
                 
                 try {
