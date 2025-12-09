@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock, Mail, Smartphone, Palette, Upload, X, ZoomIn } from 'lucide-react';
+import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock, Mail, Smartphone, Palette, Upload, X, ZoomIn, RefreshCw, Save } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Button, Input, Modal, TwoFactorModal, PhotoSelector, ImageCropper, AppLogo } from '../components/UI';
 import { UserType, User as IUser, Vendor, AppConfig } from '../types';
@@ -365,9 +365,11 @@ export const AdminDashboard: React.FC = () => {
 
   // Branding Handlers
   const handleLogoUpload = (data: string) => {
+      // If data is Base64 (from upload), open cropper
       if (data.startsWith('data:')) {
           setImageToCrop(data);
       } else {
+          // If URL, set directly
           setTempConfig({ ...tempConfig, logoUrl: data });
       }
   };
@@ -398,6 +400,7 @@ export const AdminDashboard: React.FC = () => {
       if (confirm("Voltar para a identidade padrão?")) {
           const defaultConfig = {
               appName: "O QUE TEM PERTO?",
+              appDescription: "Descubra os melhores serviços e comércios da região em um só lugar.",
               logoUrl: null,
               logoWidth: 300,
               primaryColor: "#0ea5e9",
@@ -577,92 +580,136 @@ export const AdminDashboard: React.FC = () => {
         {/* BRANDING CUSTOMIZATION TAB */}
         {activeTab === 'customization' && (
             <div className="space-y-6 animate-fade-in">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="font-bold text-sm text-gray-800 mb-4 border-b pb-2">Identidade Visual</h3>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div className="flex justify-between items-center mb-6 border-b pb-4">
+                        <div>
+                             <h3 className="font-bold text-lg text-gray-800">Identidade Visual</h3>
+                             <p className="text-xs text-gray-500">Edite a logo, cores e textos da tela inicial.</p>
+                        </div>
+                        <RefreshCw size={18} className="text-gray-400" />
+                    </div>
                     
-                    {/* Preview Area */}
-                    <div className="mb-6 p-6 bg-gray-50 rounded-xl border border-gray-200 flex justify-center overflow-hidden relative">
-                         <div className="absolute top-2 left-2 text-[10px] text-gray-400 font-bold uppercase">Preview</div>
-                         <AppLogo customUrl={tempConfig.logoUrl} />
+                    {/* Live Preview Section */}
+                    <div className="mb-8 relative group">
+                        <div className="absolute top-2 left-2 z-10 bg-black/70 text-white text-[10px] px-2 py-1 rounded uppercase font-bold tracking-wider pointer-events-none">
+                            Preview da Home
+                        </div>
+                        <div className="p-8 bg-gradient-to-br from-sky-100 via-white to-sky-50 rounded-2xl border-2 border-gray-200 border-dashed flex flex-col items-center justify-center text-center overflow-hidden">
+                             <div className="transform scale-90 sm:scale-100 transition-all duration-300">
+                                 {/* Use prop-based config for live preview */}
+                                 <AppLogo config={tempConfig} />
+                             </div>
+                             <p className="text-gray-500 mt-6 text-sm max-w-xs mx-auto font-medium">
+                                {tempConfig.appDescription || "Sua frase de efeito aparecerá aqui."}
+                             </p>
+                        </div>
                     </div>
 
-                    <div className="space-y-4">
-                        <Input 
-                            label="Nome do Aplicativo (Título)" 
-                            value={tempConfig.appName} 
-                            onChange={(e) => setTempConfig({...tempConfig, appName: e.target.value})} 
-                        />
+                    <div className="grid gap-6">
                         
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Cor Primária (Texto/Ícone)</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="color" 
-                                        value={tempConfig.primaryColor}
-                                        onChange={(e) => setTempConfig({...tempConfig, primaryColor: e.target.value})}
-                                        className="h-10 w-10 rounded cursor-pointer border-0"
-                                    />
-                                    <input 
-                                        type="text" 
-                                        value={tempConfig.primaryColor}
-                                        readOnly
-                                        className="flex-1 border rounded px-2 text-xs text-gray-600 bg-gray-50"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Cor Secundária (Destaque)</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="color" 
-                                        value={tempConfig.secondaryColor}
-                                        onChange={(e) => setTempConfig({...tempConfig, secondaryColor: e.target.value})}
-                                        className="h-10 w-10 rounded cursor-pointer border-0"
-                                    />
-                                    <input 
-                                        type="text" 
-                                        value={tempConfig.secondaryColor}
-                                        readOnly
-                                        className="flex-1 border rounded px-2 text-xs text-gray-600 bg-gray-50"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Tamanho da Logo ({tempConfig.logoWidth}px)</label>
-                            <input 
-                                type="range" 
-                                min="100" 
-                                max="500" 
-                                value={tempConfig.logoWidth} 
-                                onChange={(e) => setTempConfig({...tempConfig, logoWidth: parseInt(e.target.value)})}
-                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                            />
-                        </div>
-
-                        <div>
+                        {/* 1. Logo Upload & Size */}
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <h4 className="font-bold text-gray-700 text-sm mb-3 flex items-center gap-2"><Upload size={16}/> Logo Principal</h4>
+                            
                             <PhotoSelector 
-                                label="Upload de Nova Logo (Imagem)" 
+                                label="Enviar Nova Logo" 
                                 currentPhotoUrl={tempConfig.logoUrl}
                                 onPhotoSelected={handleLogoUpload}
                             />
+                            
                             {tempConfig.logoUrl && (
                                 <button 
                                     onClick={() => setTempConfig({...tempConfig, logoUrl: null})}
-                                    className="text-xs text-red-500 hover:underline mt-1"
+                                    className="text-xs text-red-500 hover:underline mt-1 mb-4"
                                 >
-                                    Remover logo personalizada (Usar padrão)
+                                    Remover logo personalizada (Restaurar Padrão)
                                 </button>
                             )}
+
+                            <div>
+                                <label className="flex justify-between text-xs font-bold text-gray-500 mb-1">
+                                    <span>Tamanho da Logo</span>
+                                    <span>{tempConfig.logoWidth}px</span>
+                                </label>
+                                <input 
+                                    type="range" 
+                                    min="150" 
+                                    max="500" 
+                                    step="10"
+                                    value={tempConfig.logoWidth} 
+                                    onChange={(e) => setTempConfig({...tempConfig, logoWidth: parseInt(e.target.value)})}
+                                    className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-sky-600"
+                                />
+                            </div>
                         </div>
 
-                        <div className="flex gap-2 pt-2">
-                            <Button fullWidth onClick={handleSaveConfig} disabled={isSavingConfig}>
-                                {isSavingConfig ? 'Salvando...' : 'Aplicar Alterações'}
+                        {/* 2. Colors */}
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <h4 className="font-bold text-gray-700 text-sm mb-3 flex items-center gap-2"><Palette size={16}/> Cores do Tema</h4>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">Cor Primária</label>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="color" 
+                                            value={tempConfig.primaryColor}
+                                            onChange={(e) => setTempConfig({...tempConfig, primaryColor: e.target.value})}
+                                            className="h-10 w-12 rounded cursor-pointer border border-gray-300 p-0 overflow-hidden"
+                                        />
+                                        <input 
+                                            type="text" 
+                                            value={tempConfig.primaryColor}
+                                            readOnly
+                                            className="w-full border rounded px-2 py-2 text-xs text-gray-600 font-mono bg-white"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 mt-1">Botões, Títulos, Ícones</p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">Cor Secundária</label>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="color" 
+                                            value={tempConfig.secondaryColor}
+                                            onChange={(e) => setTempConfig({...tempConfig, secondaryColor: e.target.value})}
+                                            className="h-10 w-12 rounded cursor-pointer border border-gray-300 p-0 overflow-hidden"
+                                        />
+                                        <input 
+                                            type="text" 
+                                            value={tempConfig.secondaryColor}
+                                            readOnly
+                                            className="w-full border rounded px-2 py-2 text-xs text-gray-600 font-mono bg-white"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 mt-1">Destaques, Detalhes</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 3. Texts */}
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <h4 className="font-bold text-gray-700 text-sm mb-3 flex items-center gap-2"><Edit2 size={16}/> Textos</h4>
+                            <Input 
+                                label="Nome do Aplicativo (Título)" 
+                                value={tempConfig.appName} 
+                                onChange={(e) => setTempConfig({...tempConfig, appName: e.target.value})}
+                                placeholder="Ex: GUIA LOCAL"
+                            />
+                            <Input 
+                                label="Slogan / Descrição" 
+                                value={tempConfig.appDescription || ''} 
+                                onChange={(e) => setTempConfig({...tempConfig, appDescription: e.target.value})} 
+                                placeholder="Ex: O melhor guia da cidade."
+                                multiline
+                            />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-3 pt-4 border-t border-gray-100">
+                            <Button fullWidth onClick={handleSaveConfig} disabled={isSavingConfig} icon={<Save size={18} />}>
+                                {isSavingConfig ? 'Aplicando...' : 'Salvar Alterações'}
                             </Button>
-                            <Button variant="outline" onClick={handleResetConfig} disabled={isSavingConfig}>
+                            <Button variant="outline" onClick={handleResetConfig} disabled={isSavingConfig} icon={<RefreshCw size={18} />}>
                                 Restaurar Padrão
                             </Button>
                         </div>

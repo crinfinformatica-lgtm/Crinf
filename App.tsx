@@ -40,6 +40,7 @@ const initialState: AppState = {
     darkMode: localStorage.getItem('theme') === 'dark',
     appConfig: {
         appName: "O QUE TEM PERTO?",
+        appDescription: "Descubra os melhores serviços e comércios da região em um só lugar.",
         logoUrl: null, // Default
         logoWidth: 300,
         primaryColor: "#0ea5e9", // Sky 500

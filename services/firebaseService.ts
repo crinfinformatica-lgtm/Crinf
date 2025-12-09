@@ -11,7 +11,7 @@ import {
   where,
   updateDoc
 } from "firebase/firestore";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { db, storage, auth } from "../firebaseConfig";
 import { User, Vendor, UserType, AppConfig } from "../types";
@@ -30,20 +30,36 @@ const sanitizePayload = (data: any) => {
     return cleanData;
 };
 
-// Upload Base64 Image to Firebase Storage with Timeout
+// Converte Base64 (DataURL) para Blob (Arquivo Binário)
+// Isso resolve problemas de upload de strings longas
+const dataURLtoBlob = (dataurl: string) => {
+    const arr = dataurl.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], {type:mime});
+};
+
+// Upload Base64 Image to Firebase Storage with Timeout using uploadBytes (Robust)
 export const uploadImageToFirebase = async (base64Data: string, path: string): Promise<string> => {
   if (!base64Data) return '';
   
   try {
     const storageRef = ref(storage, path);
-    
-    // Create a timeout promise (25 seconds)
+    const blob = dataURLtoBlob(base64Data); // Converte para arquivo real
+
+    // Create a timeout promise (60 seconds for slower networks)
     const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Tempo limite excedido (25s). Verifique sua internet.")), 25000)
+        setTimeout(() => reject(new Error("Tempo limite excedido (60s). Verifique sua internet.")), 60000)
     );
 
-    // Upload task
-    const uploadTask = uploadString(storageRef, base64Data, 'data_url');
+    // Upload task using uploadBytes (Binary) instead of uploadString
+    const uploadTask = uploadBytes(storageRef, blob);
 
     // Race between upload and timeout
     await Promise.race([uploadTask, timeoutPromise]);

@@ -76,6 +76,7 @@ export interface SecurityLog {
 // Global App Configuration (Branding)
 export interface AppConfig {
   appName: string;
+  appDescription: string; // Tagline / Slogan
   logoUrl: string | null; // If null, use default SVG
   logoWidth: number; // Pixel width for the logo
   primaryColor: string; // Hex code

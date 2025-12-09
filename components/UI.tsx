@@ -347,14 +347,13 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    const size = 300; // Output size
+    const size = 512; // Output size increased for better logo quality
     canvas.width = size;
     canvas.height = size;
 
     if (ctx) {
-      // Clear background
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, size, size);
+      // Clear background - Transparent
+      ctx.clearRect(0, 0, size, size);
 
       // Save context
       ctx.save();
@@ -383,7 +382,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
       ctx.drawImage(img, x, y, drawWidth, drawHeight);
       
       ctx.restore();
-      onCropComplete(canvas.toDataURL('image/jpeg', 0.9));
+      onCropComplete(canvas.toDataURL('image/png', 1.0)); // PNG for transparency
     }
   };
 
@@ -396,7 +395,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
         </div>
         
         <div 
-          className="relative w-full h-80 bg-gray-100 overflow-hidden cursor-move touch-none flex items-center justify-center"
+          className="relative w-full h-80 bg-gray-100 overflow-hidden cursor-move touch-none flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/checkerboard.png')]"
           ref={containerRef}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -417,8 +416,8 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
                width: 'auto'
              }}
            />
-           {/* Overlay Guide */}
-           <div className="absolute inset-0 border-[30px] border-black/30 pointer-events-none rounded-full" style={{ borderRadius: '50%' }}></div>
+           {/* Overlay Guide (Circle or Square depending on need - Square for Logos usually better) */}
+           <div className="absolute inset-0 border-[2px] border-dashed border-sky-500/50 pointer-events-none m-10"></div>
         </div>
 
         <div className="p-4 bg-white">
@@ -426,7 +425,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
               <ZoomIn size={20} className="text-gray-400" />
               <input 
                 type="range" 
-                min="1" 
+                min="0.5" 
                 max="3" 
                 step="0.1" 
                 value={scale} 
@@ -437,7 +436,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
            
            <div className="flex gap-2">
               <Button variant="outline" onClick={onCancel} fullWidth>Cancelar</Button>
-              <Button onClick={handleSave} fullWidth icon={<Save size={18} />}>Salvar Foto</Button>
+              <Button onClick={handleSave} fullWidth icon={<Save size={18} />}>Salvar Recorte</Button>
            </div>
         </div>
       </div>
@@ -683,17 +682,18 @@ export const TwoFactorModal: React.FC<TwoFactorModalProps> = ({ isOpen, onClose,
 
 // --- DYNAMIC APP LOGO ---
 interface AppLogoProps {
-    customUrl?: string | null; // Allow override for previews
+    config?: AppConfig; // Allow passing config explicitly (for previews)
+    customUrl?: string | null; // Deprecated but kept for compatibility
 }
 
-export const AppLogo: React.FC<AppLogoProps> = ({ customUrl }) => {
+export const AppLogo: React.FC<AppLogoProps> = ({ config: propConfig, customUrl }) => {
     const { state } = useAppContext();
-    const config = state.appConfig;
+    // Prioritize propConfig (preview), then state.appConfig
+    const config = propConfig || state.appConfig;
     
     // Determine which image URL to use
-    // If customUrl prop is passed, use it (for preview)
-    // Else if config.logoUrl exists, use it
-    // Else null (use default SVG)
+    // If customUrl is provided (old way), use it.
+    // If config has logoUrl, use it.
     const logoImage = customUrl !== undefined ? customUrl : config.logoUrl;
 
     if (logoImage) {

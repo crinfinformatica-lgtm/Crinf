@@ -101,7 +101,7 @@ export const Home: React.FC = () => {
                 </div>
                 
                 <p className="text-gray-500 mb-10 text-sm max-w-xs mx-auto font-medium">
-                    Descubra os melhores serviços e comércios da região em um só lugar.
+                    {state.appConfig.appDescription || "Descubra os melhores serviços e comércios da região em um só lugar."}
                 </p>
                 
                 {/* Main Action Buttons */}
