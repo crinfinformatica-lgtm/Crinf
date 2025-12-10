@@ -5,7 +5,7 @@ import { User, Settings, Edit3, Upload, Heart, Share2, Bell, Moon, Lock, Chevron
 import { useAppContext } from '../App';
 import { Button, Input, Modal, ImageCropper, TwoFactorModal, PhotoSelector } from '../components/UI';
 import { UserType as UserEnum, CATEGORIES } from '../types';
-import { uploadImageToFirebase, updateVendorPartial } from '../services/firebaseService';
+import { uploadImageToFirebase, updateVendorPartial, logoutUser } from '../services/firebaseService';
 import { ALLOWED_NEIGHBORHOODS } from '../config';
 
 // Lazy load admin dashboard
@@ -97,8 +97,9 @@ export const SettingsPage: React.FC = () => {
         }
     }, [isEditProfileOpen, state.currentUser, state.vendors]);
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
         if(confirm("Tem certeza que deseja sair?")) {
+            await logoutUser();
             dispatch({ type: 'LOGOUT' });
             navigate('/');
         }
@@ -111,15 +112,31 @@ export const SettingsPage: React.FC = () => {
             url: window.location.href.split('#')[0]
         };
     
-        if (navigator.share) {
-            try {
+        try {
+            if (navigator.share) {
                 await navigator.share(shareData);
-            } catch (err) {
-                console.log('Error sharing', err);
+            } else {
+                throw new Error("Share API not supported");
             }
-        } else {
-            navigator.clipboard.writeText(shareData.url);
-            alert('Link do aplicativo copiado para a área de transferência!');
+        } catch (err) {
+            // Fallback to clipboard
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                     await navigator.clipboard.writeText(shareData.url);
+                } else {
+                     // Fallback for older browsers / http
+                     const textArea = document.createElement("textarea");
+                     textArea.value = shareData.url;
+                     document.body.appendChild(textArea);
+                     textArea.focus();
+                     textArea.select();
+                     document.execCommand('copy');
+                     document.body.removeChild(textArea);
+                }
+                alert('Link do aplicativo copiado para a área de transferência!');
+            } catch (clipboardErr) {
+                 alert('Não foi possível compartilhar automaticamente. Por favor, copie o link do navegador.');
+            }
         }
     };
     
@@ -271,6 +288,7 @@ export const SettingsPage: React.FC = () => {
             alert(`Erro ao salvar perfil: ${error.message}`);
         } finally {
             setIsSaving(false);
+            setSavingStatus("");
         }
     };
     

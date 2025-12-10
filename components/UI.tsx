@@ -54,7 +54,7 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-// --- Photo Selector Component ---
+// --- Photo Selector Component (COM COMPRESSÃO AUTOMÁTICA) ---
 interface PhotoSelectorProps {
     currentPhotoUrl?: string | null;
     onPhotoSelected: (data: string) => void; // Returns Base64 or URL
@@ -65,6 +65,7 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
     const [mode, setMode] = useState<'UPLOAD' | 'URL'>('UPLOAD');
     const [preview, setPreview] = useState<string | null>(currentPhotoUrl || null);
     const [urlInput, setUrlInput] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -74,23 +75,49 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
         }
     }, [currentPhotoUrl]);
 
+    // FUNÇÃO MÁGICA: Reduz a imagem ANTES de qualquer coisa
+    const processFile = (file: File) => {
+        setIsProcessing(true);
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target?.result as string;
+            
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 800; // Limite seguro para qualquer celular
+                const scaleSize = MAX_WIDTH / img.width;
+                
+                // Se a imagem for menor que o limite, usa tamanho original, senão reduz
+                const width = (scaleSize < 1) ? MAX_WIDTH : img.width;
+                const height = (scaleSize < 1) ? img.height * scaleSize : img.height;
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.drawImage(img, 0, 0, width, height);
+                    // Comprime para JPEG 70% -> Resultado ~50kb a 150kb
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    
+                    console.log("Imagem otimizada:", (compressedDataUrl.length / 1024).toFixed(2), "KB");
+                    
+                    setPreview(compressedDataUrl);
+                    onPhotoSelected(compressedDataUrl);
+                    setIsProcessing(false);
+                }
+            };
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            if (file.size > 5 * 1024 * 1024) {
-                alert("Aviso: A imagem é maior que 5MB. Por favor, escolha uma menor.");
-                e.target.value = '';
-                return;
-            }
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const res = reader.result as string;
-                setPreview(res);
-                onPhotoSelected(res);
-            };
-            reader.readAsDataURL(file);
+            processFile(file);
         }
-        // Reset input to allow selecting same file again if needed
         e.target.value = ''; 
     };
 
@@ -148,13 +175,22 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
                 )}
 
                 {mode === 'UPLOAD' ? (
-                    <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer py-4">
-                        {!preview && <Upload className="mx-auto text-gray-400 mb-2" />}
-                        <p className="text-sm text-gray-600 font-medium">Clique para enviar foto</p>
-                        <p className="text-xs text-gray-400 mt-1">Galeria, Câmera ou Google Fotos</p>
-                        <div className="flex items-center justify-center gap-1 mt-2 text-[10px] text-orange-600 bg-orange-50 inline-block px-2 py-1 rounded">
-                             <AlertCircle size={10} /> Máximo: 5MB
-                        </div>
+                    <div onClick={() => !isProcessing && fileInputRef.current?.click()} className="cursor-pointer py-4">
+                        {isProcessing ? (
+                            <div className="flex flex-col items-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+                                <p className="text-xs text-primary font-bold">Otimizando foto...</p>
+                            </div>
+                        ) : (
+                            <>
+                                {!preview && <Upload className="mx-auto text-gray-400 mb-2" />}
+                                <p className="text-sm text-gray-600 font-medium">Clique para enviar foto</p>
+                                <p className="text-xs text-gray-400 mt-1">Galeria, Câmera ou Google Fotos</p>
+                                <div className="flex items-center justify-center gap-1 mt-2 text-[10px] text-green-600 bg-green-50 inline-block px-2 py-1 rounded">
+                                     <Check size={10} /> Otimização Automática
+                                </div>
+                            </>
+                        )}
                         <input 
                             ref={fileInputRef} 
                             type="file" 
@@ -167,16 +203,15 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
                     <div className="py-2">
                          <div className="flex items-center gap-2 mb-2 justify-center text-xs text-gray-500">
                              <ImageIcon size={14} />
-                             <span>Cole o link direto da imagem (Google Fotos, Imgur, etc)</span>
+                             <span>Cole o link direto da imagem</span>
                          </div>
                          <input 
                             type="text" 
-                            placeholder="https://exemplo.com/foto.jpg"
+                            placeholder="https://..."
                             value={urlInput}
                             onChange={handleUrlChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
                          />
-                         <p className="text-[10px] text-gray-400 mt-2">Dica: Use links diretos que terminem em .jpg ou .png para melhor funcionamento.</p>
                     </div>
                 )}
             </div>
@@ -205,7 +240,6 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({ onSuccess,
             }
         } catch (error) {
             console.error(error);
-            // Alert already handled in service
         } finally {
             setIsLoading(false);
         }
@@ -347,25 +381,18 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    const size = 512; // Output size increased for better logo quality
+    const size = 512; 
     canvas.width = size;
     canvas.height = size;
 
     if (ctx) {
-      // Clear background - Transparent
       ctx.clearRect(0, 0, size, size);
-
-      // Save context
       ctx.save();
-      
-      // Move to center to apply scale
       ctx.translate(size / 2, size / 2);
       ctx.scale(scale, scale);
       ctx.translate(-size / 2, -size / 2);
 
-      // Draw image with position offset
       const img = imgRef.current;
-      
       const aspect = img.naturalWidth / img.naturalHeight;
       let drawWidth = size;
       let drawHeight = size;
@@ -380,9 +407,8 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
       const y = (size - drawHeight) / 2 + position.y / scale;
 
       ctx.drawImage(img, x, y, drawWidth, drawHeight);
-      
       ctx.restore();
-      onCropComplete(canvas.toDataURL('image/png', 1.0)); // PNG for transparency
+      onCropComplete(canvas.toDataURL('image/png', 0.9));
     }
   };
 
@@ -416,7 +442,6 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
                width: 'auto'
              }}
            />
-           {/* Overlay Guide (Circle or Square depending on need - Square for Logos usually better) */}
            <div className="absolute inset-0 border-[2px] border-dashed border-sky-500/50 pointer-events-none m-10"></div>
         </div>
 
@@ -692,8 +717,6 @@ export const AppLogo: React.FC<AppLogoProps> = ({ config: propConfig, customUrl 
     const config = propConfig || state.appConfig;
     
     // Determine which image URL to use
-    // If customUrl is provided (old way), use it.
-    // If config has logoUrl, use it.
     const logoImage = customUrl !== undefined ? customUrl : config.logoUrl;
 
     if (logoImage) {
@@ -712,9 +735,9 @@ export const AppLogo: React.FC<AppLogoProps> = ({ config: propConfig, customUrl 
         );
     }
 
-    // Default SVG Fallback with Dynamic Colors
+    // Default SVG Fallback
     return (
-        <svg viewBox="25 20 250 100" className="w-full h-auto drop-shadow-xl animate-fade-in mx-auto" style={{ maxWidth: `${config.logoWidth}px` }}>
+        <svg viewBox="-5 -5 110 110" className="w-full h-auto drop-shadow-xl animate-fade-in mx-auto" style={{ maxWidth: `${config.logoWidth}px` }}>
             <defs>
             <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
                 <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
@@ -729,28 +752,26 @@ export const AppLogo: React.FC<AppLogoProps> = ({ config: propConfig, customUrl 
             </filter>
             </defs>
 
-            {/* TEXT ON TOP - DYNAMIC APP NAME */}
-            <text x="150" y="45" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="26" fontWeight="900" fill={config.primaryColor} letterSpacing="0.5">
-                {config.appName}
-            </text>
-
-            {/* GRAPHIC GROUP - Centered Below Text */}
-            <g transform="translate(105, 55)">
+            {/* GRAPHIC GROUP - Centered in 100x100 Square */}
+            <g>
                 {/* Connected Lines */}
-                <line x1="25" y1="30" x2="25" y2="70" stroke="#0c4a6e" strokeWidth="5" />
-                <line x1="25" y1="50" x2="65" y2="50" stroke="#0c4a6e" strokeWidth="5" />
+                <line x1="30" y1="30" x2="30" y2="70" stroke="#0c4a6e" strokeWidth="5" />
+                <line x1="30" y1="50" x2="70" y2="50" stroke="#0c4a6e" strokeWidth="5" />
 
                 {/* Circle 1: Shop (Secondary Color) - Top Left */}
-                <g transform="translate(25, 30)">
+                <g transform="translate(30, 30)">
                     <circle r="19" fill="white" stroke={config.secondaryColor} strokeWidth="3" filter="url(#shadow)"/>
                     <g transform="translate(-10, -10) scale(0.8)">
-                        <path d="M2 9a3 3 0 0 1 0-6h20a3 3 0 0 1 0 6v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9Z" fill={config.secondaryColor}/>
-                        <path d="M1 5h22v4H1z" fill={config.secondaryColor} fillOpacity="0.8"/>
+                        {/* Shopping Bag Icon */}
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" fill={config.secondaryColor} opacity="0.2"/>
+                        <path d="M16 10a4 4 0 0 1-8 0" stroke={config.secondaryColor} strokeWidth="3" fill="none" strokeLinecap="round"/>
+                        <path d="M3 6h18" stroke={config.secondaryColor} strokeWidth="2"/>
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4H6z" stroke={config.secondaryColor} strokeWidth="2" fill="none"/>
                     </g>
                 </g>
 
                 {/* Circle 2: Tools (Primary Color) - Bottom Left */}
-                <g transform="translate(25, 70)">
+                <g transform="translate(30, 70)">
                     <circle r="19" fill="white" stroke={config.primaryColor} strokeWidth="3" filter="url(#shadow)"/>
                     <g transform="translate(-9, -9) scale(0.75)">
                         <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" fill={config.primaryColor}/>
@@ -758,7 +779,7 @@ export const AppLogo: React.FC<AppLogoProps> = ({ config: propConfig, customUrl 
                 </g>
 
                 {/* Circle 3: User (Dark Blue / Static) - Right */}
-                <g transform="translate(65, 50)">
+                <g transform="translate(70, 50)">
                     <circle r="19" fill="white" stroke="#0c4a6e" strokeWidth="3" filter="url(#shadow)"/>
                     <g transform="translate(-9, -9) scale(0.75)">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="#0c4a6e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>

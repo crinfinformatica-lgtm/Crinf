@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock, Mail, Smartphone, Palette, Upload, X, ZoomIn, RefreshCw, Save } from 'lucide-react';
+import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock, Mail, Smartphone, Palette, Upload, X, ZoomIn, RefreshCw, Save, Download } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Button, Input, Modal, TwoFactorModal, PhotoSelector, ImageCropper, AppLogo } from '../components/UI';
 import { UserType, User as IUser, Vendor, AppConfig } from '../types';
@@ -56,7 +56,6 @@ export const AdminDashboard: React.FC = () => {
   const [copied, setCopied] = useState(false);
 
   // FETCH USERS ONLY WHEN ADMIN DASHBOARD MOUNTS
-  // This solves the scalability issue of downloading everyone at app startup
   useEffect(() => {
       console.log("Admin Dashboard: Subscribing to user list...");
       const unsubscribe = subscribeToUsers((users) => {
@@ -149,7 +148,6 @@ export const AdminDashboard: React.FC = () => {
   const handleSendResetLink = async (targetUser: IUser) => {
       if (!confirm(`Enviar link de redefinição de senha para ${targetUser.email}?`)) return;
 
-      // Construct the reset link
       const resetLink = `${window.location.href.split('#')[0]}#/reset-password?id=${targetUser.id}`;
 
       const templateParams = {
@@ -195,13 +193,11 @@ export const AdminDashboard: React.FC = () => {
       if (editingItem.dataType === 'user') {
           const isEditingSelf = state.currentUser?.id === editingItem.id;
           
-          // 1. Proteger usuário Master de edições externas, mas permitir que ele se edite
           if (editingItem.email === APP_CONFIG.EMAILJS.ADMIN_EMAIL && !isEditingSelf) {
               alert("Não é permitido alterar o usuário Master.");
               return;
           }
 
-          // 2. Validação de Email Duplicado
           if (editEmail !== editingItem.email) {
               const emailExists = state.users.some(u => u.email.toLowerCase() === editEmail.toLowerCase() && u.id !== editingItem.id);
               if (emailExists) {
@@ -365,11 +361,9 @@ export const AdminDashboard: React.FC = () => {
 
   // Branding Handlers
   const handleLogoUpload = (data: string) => {
-      // If data is Base64 (from upload), open cropper
       if (data.startsWith('data:')) {
           setImageToCrop(data);
       } else {
-          // If URL, set directly
           setTempConfig({ ...tempConfig, logoUrl: data });
       }
   };
@@ -409,6 +403,103 @@ export const AdminDashboard: React.FC = () => {
           setTempConfig(defaultConfig);
           updateAppConfig(defaultConfig).then(c => dispatch({ type: 'SET_APP_CONFIG', payload: c }));
       }
+  };
+
+  const handleDownloadLogo = () => {
+    try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const width = 1000;
+        const height = 400; // Aspect ratio of the SVG viewbox (250x100)
+        canvas.width = width;
+        canvas.height = height;
+
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+
+        let src = "";
+
+        if (tempConfig.logoUrl) {
+            src = tempConfig.logoUrl;
+        } else {
+            // Construct the Default SVG string (Replicating AppLogo Logic)
+            const svgData = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="25 20 250 100" width="${width}" height="${height}">
+                <defs>
+                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
+                    <feOffset dx="1.5" dy="1.5" result="offsetblur"/>
+                    <feComponentTransfer>
+                    <feFuncA type="linear" slope="0.4"/>
+                    </feComponentTransfer>
+                    <feMerge> 
+                    <feMergeNode/>
+                    <feMergeNode in="SourceGraphic"/> 
+                    </feMerge>
+                </filter>
+                </defs>
+
+                <text x="150" y="45" text-anchor="middle" font-family="Arial Black, sans-serif" font-size="26" font-weight="900" fill="${tempConfig.primaryColor}" letter-spacing="0.5">
+                    ${tempConfig.appName}
+                </text>
+
+                <g transform="translate(105, 55)">
+                    <line x1="25" y1="30" x2="25" y2="70" stroke="#0c4a6e" stroke-width="5" />
+                    <line x1="25" y1="50" x2="65" y2="50" stroke="#0c4a6e" stroke-width="5" />
+
+                    <g transform="translate(25, 30)">
+                        <circle r="19" fill="white" stroke="${tempConfig.secondaryColor}" stroke-width="3" filter="url(#shadow)"/>
+                        <g transform="translate(-10, -10) scale(0.8)">
+                            <path d="M2 9a3 3 0 0 1 0-6h20a3 3 0 0 1 0 6v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9Z" fill="${tempConfig.secondaryColor}"/>
+                            <path d="M1 5h22v4H1z" fill="${tempConfig.secondaryColor}" fill-opacity="0.8"/>
+                        </g>
+                    </g>
+
+                    <g transform="translate(25, 70)">
+                        <circle r="19" fill="white" stroke="${tempConfig.primaryColor}" stroke-width="3" filter="url(#shadow)"/>
+                        <g transform="translate(-9, -9) scale(0.75)">
+                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" fill="${tempConfig.primaryColor}"/>
+                        </g>
+                    </g>
+
+                    <g transform="translate(65, 50)">
+                        <circle r="19" fill="white" stroke="#0c4a6e" stroke-width="3" filter="url(#shadow)"/>
+                        <g transform="translate(-9, -9) scale(0.75)">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" fill="none" stroke="#0c4a6e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="12" cy="7" r="4" fill="#0c4a6e"/>
+                        </g>
+                    </g>
+                </g>
+            </svg>`;
+            src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }
+
+        img.src = src;
+        img.onload = () => {
+            if (ctx) {
+                // If using custom image, keep aspect ratio
+                if (tempConfig.logoUrl) {
+                    const aspect = img.width / img.height;
+                    canvas.height = canvas.width / aspect;
+                    canvas.width = 1000;
+                    canvas.height = 1000 / aspect;
+                }
+                
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const pngUrl = canvas.toDataURL("image/png");
+                
+                const link = document.createElement('a');
+                link.download = `logo-${tempConfig.appName.replace(/\s+/g, '-').toLowerCase()}.png`;
+                link.href = pngUrl;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        };
+    } catch (e) {
+        console.error("Download failed", e);
+        alert("Erro ao gerar imagem para download.");
+    }
   };
 
   const isMaster = state.currentUser?.type === UserType.MASTER;
@@ -477,74 +568,75 @@ export const AdminDashboard: React.FC = () => {
                                         {user.type === UserType.ADMIN && <span className="bg-sky-100 text-sky-700 text-[10px] px-1 rounded font-bold border border-sky-200">ADMIN</span>}
                                         {isLocked && <span className="bg-red-100 text-red-700 text-[10px] px-1 rounded font-bold border border-red-200 flex items-center gap-1"><Lock size={8}/> BLOQUEADO</span>}
                                     </div>
-                                    <p className="text-[10px] text-gray-500">{user.email}</p>
+                                    <p className="text-xs text-gray-500">{user.email}</p>
+                                    <p className="text-[10px] text-gray-400">{user.type === UserType.VENDOR ? 'Conta Comercial' : 'Cliente Padrão'} • {user.cpf}</p>
                                 </div>
                             </div>
-                            
                             <div className="flex gap-2 justify-end">
-                                {isMaster && !isMasterUser && (
-                                    <button onClick={() => handleSendResetLink(user)} className="p-1.5 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100" title="Enviar Link de Senha"><Mail size={14} /></button>
-                                )}
                                 {canEdit && (
-                                    <button onClick={() => openEditModal(user, 'user')} className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"><Edit2 size={14} /></button>
-                                )}
-                                {!isMasterUser && (
                                     <>
-                                        <button onClick={() => handleBan(user, 'user')} className="p-1.5 bg-orange-50 text-orange-600 rounded hover:bg-orange-100"><Ban size={14} /></button>
-                                        <button onClick={() => handleDelete(user.id, 'user')} className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-100"><Trash2 size={14} /></button>
+                                        <button onClick={() => openEditModal(user, 'user')} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg">
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <button onClick={() => handleSendResetLink(user)} className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-lg" title="Enviar link de redefinição de senha">
+                                            <Mail size={16} />
+                                        </button>
+                                    </>
+                                )}
+                                {isMaster && !isMasterUser && (
+                                    <>
+                                        <button onClick={() => handleBan(user, 'user')} className="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Banir Usuário">
+                                            <Ban size={16} />
+                                        </button>
+                                        <button onClick={() => handleDelete(user.id, 'user')} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Excluir">
+                                            <Trash2 size={16} />
+                                        </button>
                                     </>
                                 )}
                             </div>
                         </div>
-                    )})}
+                        );
+                    })}
                 </div>
             </div>
-        )}
-
-        {/* LOCKED USERS TAB */}
-        {activeTab === 'blocked' && (
-             <div className="space-y-4 animate-fade-in">
-                <h3 className="font-bold text-gray-700">Usuários Bloqueados</h3>
-                {lockedUsers.length === 0 ? (
-                    <div className="text-center py-6 bg-white rounded-xl border border-dashed border-gray-300">
-                        <Check className="mx-auto text-green-500 mb-1" size={24} />
-                        <p className="text-xs text-gray-500">Nenhum usuário bloqueado no momento.</p>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                        {lockedUsers.map(user => (
-                            <div key={user.id} className="bg-red-50 p-3 rounded-xl shadow-sm border border-red-200 flex justify-between items-center">
-                                <div>
-                                    <h4 className="font-bold text-red-800 text-sm">{user.name}</h4>
-                                    <p className="text-xs text-red-600">{user.email}</p>
-                                    <p className="text-[10px] text-gray-500 mt-1">Tentativas Falhas: {user.failedLoginAttempts}</p>
-                                </div>
-                                <Button onClick={() => handleUnlockUser(user.id)} className="py-1 px-3 text-xs h-auto bg-green-600 hover:bg-green-700 shadow-none" icon={<Unlock size={14} />}>Desbloquear</Button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-             </div>
         )}
 
         {/* VENDORS TAB */}
         {activeTab === 'vendors' && (
             <div className="space-y-4 animate-fade-in">
-                 <h3 className="font-bold text-gray-700 mb-2">Gestão de Comércios</h3>
+                <h3 className="font-bold text-gray-700 mb-2">Gestão de Comércios</h3>
                 <div className="space-y-3">
                     {state.vendors.map(vendor => (
-                        <div key={vendor.id} className="bg-white p-3 rounded-xl shadow-sm border border-gray-200">
-                            <div className="flex items-center gap-3 mb-2">
-                                <img src={vendor.photoUrl} alt={vendor.name} className="w-10 h-10 rounded-lg object-cover bg-gray-100" />
+                        <div key={vendor.id} className="bg-white p-3 rounded-xl shadow-sm border border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden">
+                                    <img src={vendor.photoUrl} alt={vendor.name} className="w-full h-full object-cover" />
+                                </div>
                                 <div>
-                                    <h3 className="font-bold text-sm text-gray-800 line-clamp-1">{vendor.name}</h3>
-                                    <span className="text-[10px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full font-bold border border-sky-100">{vendor.categories[0]}</span>
+                                    <h3 className="font-bold text-sm text-gray-800">{vendor.name}</h3>
+                                    <p className="text-xs text-gray-500">{vendor.categories.join(', ')}</p>
+                                    <div className="flex gap-2 mt-1">
+                                         <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-100">
+                                            {vendor.subtype === 'SERVICE' ? 'Serviço' : 'Comércio'}
+                                         </span>
+                                         <span className="text-[10px] text-gray-400">{vendor.document}</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex gap-2 justify-end border-t border-gray-50 pt-2">
-                                <button onClick={() => openEditModal(vendor, 'vendor')} className="flex-1 py-1 bg-blue-50 text-blue-700 rounded text-[10px] font-bold hover:bg-blue-100 flex items-center justify-center gap-1"><Edit2 size={12} /> Editar</button>
-                                <button onClick={() => handleBan(vendor, 'vendor')} className="flex-1 py-1 bg-orange-50 text-orange-700 rounded text-[10px] font-bold hover:bg-orange-100 flex items-center justify-center gap-1"><Ban size={12} /> Banir</button>
-                                <button onClick={() => handleDelete(vendor.id, 'vendor')} className="px-3 bg-red-50 text-red-700 rounded text-[10px] font-bold hover:bg-red-100"><Trash2 size={12} /></button>
+                            <div className="flex gap-2 justify-end">
+                                <button onClick={() => openEditModal(vendor, 'vendor')} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg">
+                                    <Edit2 size={16} />
+                                </button>
+                                {isMaster && (
+                                    <>
+                                        <button onClick={() => handleBan(vendor, 'vendor')} className="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Banir CNPJ">
+                                            <Ban size={16} />
+                                        </button>
+                                        <button onClick={() => handleDelete(vendor.id, 'vendor')} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -552,296 +644,375 @@ export const AdminDashboard: React.FC = () => {
             </div>
         )}
 
-        {/* BANNED TAB */}
-        {activeTab === 'banned' && (
+        {/* BLOCKED USERS TAB */}
+        {activeTab === 'blocked' && (
              <div className="space-y-4 animate-fade-in">
-                <div className="flex justify-between items-center">
-                    <h3 className="font-bold text-gray-700">Banimentos</h3>
-                    <Button onClick={() => setBanModalOpen(true)} variant="danger" className="py-1 px-3 text-xs h-auto gap-1"><Gavel size={14} /> Novo</Button>
+                <div className="bg-red-50 p-3 rounded-lg border border-red-200 mb-4">
+                    <h3 className="text-sm font-bold text-red-800 flex items-center gap-2">
+                        <Lock size={16} /> Contas Bloqueadas Temporariamente
+                    </h3>
+                    <p className="text-xs text-red-600 mt-1">
+                        Usuários que erraram a senha 3 vezes consecutivas. O bloqueio dura 5 minutos, mas pode ser removido manualmente aqui.
+                    </p>
                 </div>
-                {state.bannedDocuments.length === 0 ? (
-                    <div className="text-center py-6 bg-white rounded-xl border border-dashed border-gray-300">
-                        <Check className="mx-auto text-green-500 mb-1" size={24} />
-                        <p className="text-xs text-gray-500">Nenhum banimento ativo.</p>
+
+                {lockedUsers.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400">
+                        <Check size={32} className="mx-auto mb-2 text-green-400" />
+                        <p className="text-sm">Nenhum usuário bloqueado no momento.</p>
                     </div>
                 ) : (
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100">
-                        {state.bannedDocuments.map((doc, idx) => (
-                            <div key={idx} className="p-3 flex justify-between items-center">
-                                <span className="font-mono text-xs text-gray-700">{doc}</span>
-                                <button onClick={() => handleUnban(doc)} className="text-[10px] font-bold text-green-600 hover:underline border border-green-200 bg-green-50 px-2 py-1 rounded">Liberar</button>
-                            </div>
-                        ))}
+                    <div className="space-y-3">
+                         {lockedUsers.map(user => (
+                             <div key={user.id} className="bg-white p-3 rounded-xl shadow-sm border border-red-200 flex justify-between items-center">
+                                 <div>
+                                     <h3 className="font-bold text-sm text-gray-800">{user.name}</h3>
+                                     <p className="text-xs text-red-500 font-semibold">{user.email}</p>
+                                     <p className="text-[10px] text-gray-400 mt-1">
+                                         Bloqueado até: {new Date(user.lockedUntil || 0).toLocaleTimeString()}
+                                     </p>
+                                 </div>
+                                 <Button variant="outline" onClick={() => handleUnlockUser(user.id)} className="text-xs h-8 border-red-200 text-red-600 hover:bg-red-50">
+                                     <Unlock size={14} className="mr-1" /> Desbloquear
+                                 </Button>
+                             </div>
+                         ))}
                     </div>
                 )}
              </div>
         )}
 
-        {/* BRANDING CUSTOMIZATION TAB */}
-        {activeTab === 'customization' && (
-            <div className="space-y-6 animate-fade-in">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <div className="flex justify-between items-center mb-6 border-b pb-4">
-                        <div>
-                             <h3 className="font-bold text-lg text-gray-800">Identidade Visual</h3>
-                             <p className="text-xs text-gray-500">Edite a logo, cores e textos da tela inicial.</p>
-                        </div>
-                        <RefreshCw size={18} className="text-gray-400" />
-                    </div>
-                    
-                    {/* Live Preview Section */}
-                    <div className="mb-8 relative group">
-                        <div className="absolute top-2 left-2 z-10 bg-black/70 text-white text-[10px] px-2 py-1 rounded uppercase font-bold tracking-wider pointer-events-none">
-                            Preview da Home
-                        </div>
-                        <div className="p-8 bg-gradient-to-br from-sky-100 via-white to-sky-50 rounded-2xl border-2 border-gray-200 border-dashed flex flex-col items-center justify-center text-center overflow-hidden">
-                             <div className="transform scale-90 sm:scale-100 transition-all duration-300">
-                                 {/* Use prop-based config for live preview */}
-                                 <AppLogo config={tempConfig} />
+        {/* BANNED TAB */}
+        {activeTab === 'banned' && (
+            <div className="space-y-4 animate-fade-in">
+                 <div className="flex justify-between items-center">
+                    <h3 className="font-bold text-gray-700">Lista Negra (Banidos)</h3>
+                    <Button onClick={() => setBanModalOpen(true)} className="py-1 px-3 text-xs h-auto bg-red-600 hover:bg-red-700 shadow-none text-white">
+                        Bloquear Manualmente
+                    </Button>
+                 </div>
+                 {state.bannedDocuments.length === 0 ? (
+                     <p className="text-center text-gray-400 text-sm py-4">Nenhum documento banido.</p>
+                 ) : (
+                     <div className="space-y-2">
+                         {state.bannedDocuments.map((doc, idx) => (
+                             <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 flex justify-between items-center">
+                                 <span className="text-sm font-mono text-gray-600">{doc}</span>
+                                 <button onClick={() => handleUnban(doc)} className="text-xs text-green-600 hover:underline">
+                                     Remover Bloqueio
+                                 </button>
                              </div>
-                             <p className="text-gray-500 mt-6 text-sm max-w-xs mx-auto font-medium">
-                                {tempConfig.appDescription || "Sua frase de efeito aparecerá aqui."}
-                             </p>
-                        </div>
-                    </div>
-
-                    <div className="grid gap-6">
-                        
-                        {/* 1. Logo Upload & Size */}
-                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                            <h4 className="font-bold text-gray-700 text-sm mb-3 flex items-center gap-2"><Upload size={16}/> Logo Principal</h4>
-                            
-                            <PhotoSelector 
-                                label="Enviar Nova Logo" 
-                                currentPhotoUrl={tempConfig.logoUrl}
-                                onPhotoSelected={handleLogoUpload}
-                            />
-                            
-                            {tempConfig.logoUrl && (
-                                <button 
-                                    onClick={() => setTempConfig({...tempConfig, logoUrl: null})}
-                                    className="text-xs text-red-500 hover:underline mt-1 mb-4"
-                                >
-                                    Remover logo personalizada (Restaurar Padrão)
-                                </button>
-                            )}
-
-                            <div>
-                                <label className="flex justify-between text-xs font-bold text-gray-500 mb-1">
-                                    <span>Tamanho da Logo</span>
-                                    <span>{tempConfig.logoWidth}px</span>
-                                </label>
-                                <input 
-                                    type="range" 
-                                    min="150" 
-                                    max="500" 
-                                    step="10"
-                                    value={tempConfig.logoWidth} 
-                                    onChange={(e) => setTempConfig({...tempConfig, logoWidth: parseInt(e.target.value)})}
-                                    className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-sky-600"
-                                />
-                            </div>
-                        </div>
-
-                        {/* 2. Colors */}
-                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                            <h4 className="font-bold text-gray-700 text-sm mb-3 flex items-center gap-2"><Palette size={16}/> Cores do Tema</h4>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">Cor Primária</label>
-                                    <div className="flex items-center gap-2">
-                                        <input 
-                                            type="color" 
-                                            value={tempConfig.primaryColor}
-                                            onChange={(e) => setTempConfig({...tempConfig, primaryColor: e.target.value})}
-                                            className="h-10 w-12 rounded cursor-pointer border border-gray-300 p-0 overflow-hidden"
-                                        />
-                                        <input 
-                                            type="text" 
-                                            value={tempConfig.primaryColor}
-                                            readOnly
-                                            className="w-full border rounded px-2 py-2 text-xs text-gray-600 font-mono bg-white"
-                                        />
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 mt-1">Botões, Títulos, Ícones</p>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">Cor Secundária</label>
-                                    <div className="flex items-center gap-2">
-                                        <input 
-                                            type="color" 
-                                            value={tempConfig.secondaryColor}
-                                            onChange={(e) => setTempConfig({...tempConfig, secondaryColor: e.target.value})}
-                                            className="h-10 w-12 rounded cursor-pointer border border-gray-300 p-0 overflow-hidden"
-                                        />
-                                        <input 
-                                            type="text" 
-                                            value={tempConfig.secondaryColor}
-                                            readOnly
-                                            className="w-full border rounded px-2 py-2 text-xs text-gray-600 font-mono bg-white"
-                                        />
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 mt-1">Destaques, Detalhes</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 3. Texts */}
-                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                            <h4 className="font-bold text-gray-700 text-sm mb-3 flex items-center gap-2"><Edit2 size={16}/> Textos</h4>
-                            <Input 
-                                label="Nome do Aplicativo (Título)" 
-                                value={tempConfig.appName} 
-                                onChange={(e) => setTempConfig({...tempConfig, appName: e.target.value})}
-                                placeholder="Ex: GUIA LOCAL"
-                            />
-                            <Input 
-                                label="Slogan / Descrição" 
-                                value={tempConfig.appDescription || ''} 
-                                onChange={(e) => setTempConfig({...tempConfig, appDescription: e.target.value})} 
-                                placeholder="Ex: O melhor guia da cidade."
-                                multiline
-                            />
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex gap-3 pt-4 border-t border-gray-100">
-                            <Button fullWidth onClick={handleSaveConfig} disabled={isSavingConfig} icon={<Save size={18} />}>
-                                {isSavingConfig ? 'Aplicando...' : 'Salvar Alterações'}
-                            </Button>
-                            <Button variant="outline" onClick={handleResetConfig} disabled={isSavingConfig} icon={<RefreshCw size={18} />}>
-                                Restaurar Padrão
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                         ))}
+                     </div>
+                 )}
             </div>
         )}
 
         {/* SECURITY TAB */}
         {activeTab === 'security' && (
+             <div className="space-y-6 animate-fade-in">
+                 {/* Master Password Change */}
+                 <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                     <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                         <KeyRound size={18} className="text-purple-600" /> 
+                         Alterar Senha Master
+                     </h3>
+                     <div className="space-y-3">
+                         <Input label="Senha Atual" type="password" value={currentPass} onChange={e => setCurrentPass(e.target.value)} />
+                         <Input label="Nova Senha" type="password" value={newMasterPass} onChange={e => setNewMasterPass(e.target.value)} />
+                         <Input label="Confirmar Nova Senha" type="password" value={confirmMasterPass} onChange={e => setConfirmMasterPass(e.target.value)} />
+                         <Button fullWidth onClick={handleMasterPasswordChange} className="bg-purple-600 hover:bg-purple-700">Atualizar Senha Master</Button>
+                     </div>
+                 </div>
+
+                 {/* Security Logs */}
+                 <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                     <div className="flex justify-between items-center mb-4">
+                         <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                             <History size={18} className="text-gray-600" />
+                             Logs de Atividade
+                         </h3>
+                         <button 
+                            onClick={() => dispatch({ type: 'CLEAR_SECURITY_LOGS' })}
+                            className="text-xs text-gray-400 hover:text-red-500"
+                         >
+                             Limpar
+                         </button>
+                     </div>
+                     <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
+                         {state.securityLogs.length === 0 ? (
+                             <p className="text-xs text-gray-400 text-center italic">Nenhum registro de segurança.</p>
+                         ) : (
+                             state.securityLogs.map((log, idx) => (
+                                 <div key={idx} className="text-xs p-2 bg-gray-50 rounded border border-gray-100">
+                                     <div className="flex justify-between font-semibold mb-1">
+                                         <span className={log.action === 'LOGIN_FAIL' ? 'text-red-500' : 'text-blue-500'}>{log.action}</span>
+                                         <span className="text-gray-400">{new Date(log.timestamp).toLocaleString()}</span>
+                                     </div>
+                                     <p className="text-gray-600">{log.details}</p>
+                                 </div>
+                             ))
+                         )}
+                     </div>
+                 </div>
+
+                 {/* Database Reset */}
+                 <div className="bg-red-50 p-4 rounded-xl border border-red-200">
+                     <h3 className="font-bold text-red-800 mb-2 flex items-center gap-2">
+                         <Database size={18} /> Zona de Perigo
+                     </h3>
+                     <p className="text-xs text-red-600 mb-4">
+                         Ações irreversíveis que afetam todo o banco de dados.
+                     </p>
+                     <Button variant="danger" fullWidth onClick={handleFactoryReset}>
+                         Resetar Banco de Dados (Factory Reset)
+                     </Button>
+                 </div>
+             </div>
+        )}
+        
+        {/* CUSTOMIZATION TAB */}
+        {activeTab === 'customization' && (
             <div className="space-y-6 animate-fade-in">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="font-bold text-sm text-gray-800 mb-2">Alterar Senha Master</h3>
-                    <div className="space-y-2">
-                        <Input className="text-sm" label="Senha Atual" type="password" value={currentPass} onChange={e => setCurrentPass(e.target.value)} />
-                        <Input className="text-sm" label="Nova Senha" type="password" value={newMasterPass} onChange={e => setNewMasterPass(e.target.value)} />
-                        <Input className="text-sm" label="Confirmar" type="password" value={confirmMasterPass} onChange={e => setConfirmMasterPass(e.target.value)} />
-                        <Button fullWidth onClick={handleMasterPasswordChange} className="py-2 text-sm mt-2">Atualizar</Button>
+                <div className="bg-white p-4 rounded-xl border border-gray-200">
+                     <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                             <Palette size={18} className="text-sky-600" /> Identidade Visual
+                        </h3>
+                        <Button variant="outline" onClick={handleResetConfig} className="text-xs h-8">
+                            <RefreshCw size={12} className="mr-1" /> Restaurar Padrão
+                        </Button>
+                     </div>
+
+                     <div className="space-y-4">
+                         <Input 
+                            label="Nome do Aplicativo" 
+                            value={tempConfig.appName} 
+                            onChange={e => setTempConfig({...tempConfig, appName: e.target.value})} 
+                         />
+                         <Input 
+                            label="Descrição / Slogan" 
+                            value={tempConfig.appDescription} 
+                            onChange={e => setTempConfig({...tempConfig, appDescription: e.target.value})} 
+                            placeholder="Ex: O melhor guia da cidade"
+                         />
+
+                         {/* Logo Upload */}
+                         <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-2">Logo do App</label>
+                             <PhotoSelector 
+                                label="Enviar Logo Customizada"
+                                currentPhotoUrl={tempConfig.logoUrl}
+                                onPhotoSelected={handleLogoUpload}
+                             />
+                         </div>
+
+                         {/* Size Slider */}
+                         <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">
+                                 Tamanho da Logo: {tempConfig.logoWidth}px
+                             </label>
+                             <input 
+                                type="range" 
+                                min="100" 
+                                max="500" 
+                                value={tempConfig.logoWidth} 
+                                onChange={e => setTempConfig({...tempConfig, logoWidth: parseInt(e.target.value)})}
+                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-600"
+                             />
+                         </div>
+
+                         {/* Colors */}
+                         <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Cor Primária</label>
+                                 <div className="flex items-center gap-2">
+                                     <input 
+                                        type="color" 
+                                        value={tempConfig.primaryColor}
+                                        onChange={e => setTempConfig({...tempConfig, primaryColor: e.target.value})}
+                                        className="h-10 w-10 rounded cursor-pointer border-0"
+                                     />
+                                     <span className="text-xs text-gray-500 font-mono">{tempConfig.primaryColor}</span>
+                                 </div>
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Cor Secundária</label>
+                                 <div className="flex items-center gap-2">
+                                     <input 
+                                        type="color" 
+                                        value={tempConfig.secondaryColor}
+                                        onChange={e => setTempConfig({...tempConfig, secondaryColor: e.target.value})}
+                                        className="h-10 w-10 rounded cursor-pointer border-0"
+                                     />
+                                     <span className="text-xs text-gray-500 font-mono">{tempConfig.secondaryColor}</span>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
+                </div>
+
+                {/* Preview Section */}
+                <div className="border border-gray-200 rounded-3xl overflow-hidden relative shadow-xl bg-sky-50 aspect-[9/16] max-w-xs mx-auto flex flex-col">
+                    <div className="bg-white/80 backdrop-blur-md p-4 pt-8 text-center border-b border-sky-100">
+                         <div className="transform origin-top transition-all duration-300">
+                             <AppLogo config={tempConfig} />
+                         </div>
+                         <p className="text-[10px] text-gray-500 mt-4 px-4 font-medium">
+                            {tempConfig.appDescription}
+                         </p>
+                    </div>
+                    <div className="flex-1 p-4 overflow-hidden">
+                        <div className="space-y-3 opacity-50 pointer-events-none">
+                             <div className="h-10 bg-white rounded-xl w-full"></div>
+                             <div className="flex gap-2">
+                                 <div className="h-8 w-20 bg-white rounded-lg"></div>
+                                 <div className="h-8 w-20 bg-white rounded-lg"></div>
+                             </div>
+                             <div className="h-32 bg-white rounded-2xl w-full"></div>
+                             <div className="h-32 bg-white rounded-2xl w-full"></div>
+                        </div>
+                    </div>
+                    
+                    {/* Floating Save Button */}
+                    <div className="absolute bottom-4 left-0 right-0 px-4">
+                        <Button fullWidth onClick={handleSaveConfig} disabled={isSavingConfig} icon={<Save size={18} />}>
+                            {isSavingConfig ? 'Aplicando...' : 'Salvar Alterações'}
+                        </Button>
                     </div>
                 </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                     <div className="flex justify-between items-center mb-2">
-                        <h3 className="font-bold text-sm text-gray-800">Log de Acessos</h3>
-                        <button onClick={() => dispatch({ type: 'CLEAR_SECURITY_LOGS' })} className="text-[10px] text-red-500 underline">Limpar</button>
-                    </div>
-                    <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
-                        {state.securityLogs && state.securityLogs.length > 0 ? (
-                            state.securityLogs.map((log) => (
-                                <div key={log.id} className="text-[10px] border-l-2 border-gray-200 pl-2 py-0.5">
-                                    <span className={`font-bold ${log.action === 'LOGIN_SUCCESS' ? 'text-green-600' : 'text-gray-600'}`}>
-                                        {log.action === 'LOGIN_SUCCESS' ? 'Login' : log.action}
-                                    </span>
-                                    <span className="text-gray-400 ml-2">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                                    <p className="text-gray-500 truncate">{log.details}</p>
-                                </div>
-                            ))
-                        ) : <p className="text-xs text-gray-400 italic">Vazio.</p>}
-                    </div>
-                    {isMaster && (
-                         <Button variant="danger" fullWidth className="mt-4 py-2 text-xs" onClick={handleFactoryReset} icon={<Database size={14} />}>Resetar Banco de Dados</Button>
-                     )}
+
+                {/* --- DOWNLOAD BUTTON ADDED HERE --- */}
+                <div className="text-center pb-4">
+                    <p className="text-xs text-gray-400 mb-2">Precisa da logo para marketing?</p>
+                    <Button 
+                        variant="outline" 
+                        onClick={handleDownloadLogo} 
+                        icon={<Download size={16} />}
+                        className="mx-auto"
+                    >
+                        Baixar Logo (PNG)
+                    </Button>
+                    <p className="text-[10px] text-gray-400 mt-1">Alta resolução com fundo transparente</p>
                 </div>
             </div>
         )}
 
-        {/* DISTRIBUTE TAB */}
+        {/* DISTRIBUTION TAB */}
         {activeTab === 'distribute' && (
-             <div className="space-y-4 animate-fade-in">
-                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                     <h3 className="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2">
-                         <Github size={16} /> GitHub Pages
-                     </h3>
-                     <p className="text-xs text-gray-500 mb-2">O app está pronto para hospedagem.</p>
-                     <div className="text-xs bg-gray-50 p-2 rounded text-gray-600">
-                        Faça upload dos arquivos para um repositório GitHub e ative o <strong>Pages</strong> na branch main.
+            <div className="space-y-6 animate-fade-in text-center">
+                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                     <div className="bg-sky-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                         <Share2 size={32} className="text-sky-600" />
                      </div>
-                 </div>
-                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                     <h3 className="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2">
-                         <Globe size={16} /> Link & Compartilhamento
-                     </h3>
-                     <div className="flex gap-2 mb-2">
-                         <div className="flex-1 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-xs text-gray-600 truncate font-mono">
-                             {window.location.href.split('#')[0]}
-                         </div>
-                         <button onClick={copyLink} className={`px-3 rounded font-bold transition-all text-xs text-white flex items-center gap-1 ${copied ? 'bg-green-500' : 'bg-gray-800'}`}>
-                             {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copiado' : 'Copiar'}
+                     <h3 className="font-bold text-gray-800 text-lg mb-2">Compartilhe o App</h3>
+                     <p className="text-gray-600 text-sm mb-6 max-w-xs mx-auto">
+                         Envie o link do aplicativo para clientes e parceiros aumentarem o alcance.
+                     </p>
+
+                     <div className="bg-gray-100 p-3 rounded-lg flex items-center justify-between mb-4 border border-gray-200">
+                         <span className="text-xs text-gray-600 font-mono truncate mr-2">{window.location.href.split('#')[0]}</span>
+                         <button onClick={copyLink} className="text-sky-600 hover:text-sky-700">
+                             {copied ? <Check size={16} /> : <Copy size={16} />}
                          </button>
                      </div>
-                     <div className="grid grid-cols-2 gap-2">
-                         <Button variant="primary" icon={<Smartphone size={14} />} onClick={handleNativeShare} className="py-2 text-xs bg-blue-600 hover:bg-blue-700">Compartilhar App</Button>
-                         <Button variant="primary" icon={<Share2 size={14} />} onClick={() => {
-                                const text = `Acesse nosso app: ${window.location.href.split('#')[0]}`;
-                                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-                            }} className="py-2 text-xs bg-green-600 hover:bg-green-700">WhatsApp</Button>
-                     </div>
+
+                     <Button fullWidth onClick={handleNativeShare}>
+                         Compartilhar Link
+                     </Button>
                  </div>
-             </div>
+                 
+                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                      <h3 className="font-bold text-gray-800 mb-4">QR Code de Instalação</h3>
+                      <div className="bg-white p-2 inline-block rounded-xl border border-gray-100 shadow-sm">
+                           <img 
+                             src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${window.location.href.split('#')[0]}`} 
+                             alt="QR Code" 
+                             className="w-40 h-40"
+                           />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">Escaneie para abrir</p>
+                 </div>
+            </div>
         )}
+
       </div>
 
-      {/* --- MODALS --- */}
-      <Modal isOpen={isEditModalOpen} onClose={() => setEditModalOpen(false)} title="Editar Registro">
+      {/* Edit Modal */}
+      <Modal isOpen={isEditModalOpen} onClose={() => setEditModalOpen(false)} title={`Editar ${editingItem?.dataType === 'user' ? 'Usuário' : 'Comércio'}`}>
           <div className="space-y-4">
               <Input label="Nome" value={editName} onChange={e => setEditName(e.target.value)} />
-              {editingItem?.dataType === 'user' && (
+              {editingItem?.dataType === 'user' ? (
                   <>
-                    <Input label="E-mail" value={editEmail} onChange={e => setEditEmail(e.target.value)} />
-                    <Input label="CPF" value={editDoc} onChange={e => setEditDoc(e.target.value)} />
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Acesso</label>
-                        <select 
+                      <Input label="E-mail (Login)" value={editEmail} onChange={e => setEditEmail(e.target.value)} />
+                      <Input label="CPF" value={editDoc} onChange={e => setEditDoc(e.target.value)} />
+                      <div className="mb-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Conta</label>
+                          <select 
                             value={editType} 
                             onChange={(e) => setEditType(e.target.value as UserType)}
-                            className="w-full border border-gray-300 rounded-lg p-2"
-                            disabled={editEmail === APP_CONFIG.EMAILJS.ADMIN_EMAIL}
-                        >
-                            <option value={UserType.USER}>Usuário Comum</option>
-                            <option value={UserType.ADMIN}>Administrador</option>
-                        </select>
-                    </div>
+                            className="w-full px-4 py-2 border rounded-lg bg-white"
+                          >
+                              <option value={UserType.USER}>Usuário Comum</option>
+                              <option value={UserType.VENDOR}>Conta Comercial</option>
+                              <option value={UserType.ADMIN}>Administrador</option>
+                          </select>
+                      </div>
                   </>
-              )}
-              {editingItem?.dataType === 'vendor' && (
+              ) : (
                   <Input label="Documento (CNPJ/CPF)" value={editDoc} onChange={e => setEditDoc(e.target.value)} />
               )}
               <Input label="Endereço" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
-              <Button onClick={saveEdit} fullWidth>Salvar</Button>
+              
+              <Button fullWidth onClick={saveEdit}>Salvar Alterações</Button>
           </div>
       </Modal>
 
-      <Modal isOpen={isCreateUserModalOpen} onClose={() => setCreateUserModalOpen(false)} title="Criar Novo Usuário">
+      {/* Create User Modal */}
+      <Modal isOpen={isCreateUserModalOpen} onClose={() => setCreateUserModalOpen(false)} title="Novo Usuário">
           <div className="space-y-4">
               <Input label="Nome" value={newUserName} onChange={e => setNewUserName(e.target.value)} />
               <Input label="E-mail" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} />
-              <div className="flex gap-2">
-                    <button onClick={() => setNewUserType(UserType.USER)} className={`flex-1 py-2 rounded border text-xs font-bold ${newUserType === UserType.USER ? 'bg-primary text-white' : 'bg-gray-50'}`}>Usuário</button>
-                    <button onClick={() => setNewUserType(UserType.ADMIN)} className={`flex-1 py-2 rounded border text-xs font-bold ${newUserType === UserType.ADMIN ? 'bg-sky-600 text-white' : 'bg-gray-50'}`}>Admin</button>
+              <div className="mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Conta</label>
+                  <select 
+                    value={newUserType} 
+                    onChange={(e) => setNewUserType(e.target.value as UserType)}
+                    className="w-full px-4 py-2 border rounded-lg bg-white"
+                  >
+                      <option value={UserType.USER}>Usuário Comum</option>
+                      <option value={UserType.VENDOR}>Conta Comercial</option>
+                      <option value={UserType.ADMIN}>Administrador</option>
+                  </select>
               </div>
-              <Button onClick={handleCreateUser} fullWidth>Criar Conta</Button>
+              <p className="text-xs text-gray-500 bg-gray-100 p-2 rounded">
+                  A senha padrão será <strong>123</strong>. O usuário deve alterá-la no primeiro acesso.
+              </p>
+              <Button fullWidth onClick={handleCreateUser}>Criar Usuário</Button>
           </div>
       </Modal>
 
+      {/* Manual Ban Modal */}
       <Modal isOpen={isBanModalOpen} onClose={() => setBanModalOpen(false)} title="Bloqueio Manual">
           <div className="space-y-4">
-              <Input label="E-mail, CPF ou CNPJ" value={manualBanInput} onChange={e => setManualBanInput(e.target.value)} />
-              <Button onClick={handleManualBan} variant="danger" fullWidth>Banir</Button>
+              <p className="text-sm text-gray-600">
+                  Digite o CPF, CNPJ ou E-mail que deseja banir permanentemente.
+              </p>
+              <Input label="Documento ou E-mail" value={manualBanInput} onChange={e => setManualBanInput(e.target.value)} placeholder="000.000.000-00" />
+              <Button fullWidth onClick={handleManualBan} variant="danger">Confirmar Bloqueio</Button>
           </div>
       </Modal>
 
-      <TwoFactorModal isOpen={is2FAOpen} onClose={() => set2FAOpen(false)} onSuccess={on2FASuccess} actionTitle={actionTitle} destination={state.currentUser?.email} />
-
+      {/* 2FA Modal */}
+      <TwoFactorModal 
+         isOpen={is2FAOpen}
+         onClose={() => set2FAOpen(false)}
+         onSuccess={on2FASuccess}
+         actionTitle={actionTitle}
+         destination={state.currentUser?.email}
+      />
+      
+      {/* Cropper */}
       {imageToCrop && (
           <ImageCropper 
             imageSrc={imageToCrop}

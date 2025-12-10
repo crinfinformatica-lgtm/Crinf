@@ -3,7 +3,7 @@ import {
   collection, 
   doc, 
   setDoc, 
-  getDoc,
+  getDoc, 
   getDocs, 
   deleteDoc, 
   onSnapshot,
@@ -11,15 +11,14 @@ import {
   where,
   updateDoc
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { db, storage, auth } from "../firebaseConfig";
+// REMOVIDO: import { ref, getDownloadURL, uploadBytes } from "firebase/storage";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { db, auth } from "../firebaseConfig";
 import { User, Vendor, UserType, AppConfig } from "../types";
-import { MASTER_USER, INITIAL_DB } from "../database";
+import { MASTER_USER } from "../database";
 
 // --- HELPERS ---
 
-// Função para limpar dados undefined (O Firebase não aceita undefined)
 const sanitizePayload = (data: any) => {
     const cleanData = { ...data };
     Object.keys(cleanData).forEach(key => {
@@ -30,62 +29,23 @@ const sanitizePayload = (data: any) => {
     return cleanData;
 };
 
-// Converte Base64 (DataURL) para Blob (Arquivo Binário) com tratamento de MIME Type correto
-const dataURLtoBlob = (dataurl: string) => {
-    try {
-        const arr = dataurl.split(',');
-        if (arr.length < 2) throw new Error("Formato de imagem inválido.");
-        
-        const mimeMatch = arr[0].match(/:(.*?);/);
-        const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-        
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while(n--){
-            u8arr[n] = bstr.charCodeAt(n);
-        }
-        return new Blob([u8arr], {type: mime});
-    } catch (e) {
-        console.error("Erro na conversão de imagem:", e);
-        throw new Error("Falha ao processar o arquivo de imagem.");
-    }
-};
-
-// Upload Base64 Image to Firebase Storage using uploadBytes (Robust)
+// --- UPLOAD BYPASS (STORE AS BASE64 IN DB) ---
+// Como o Firebase Storage exige plano pago, e nossas imagens são pequenas (<150kb) graças à compressão,
+// nós apenas retornamos a string Base64. O App vai salvar essa string direto no documento do Firestore.
 export const uploadImageToFirebase = async (base64Data: string, path: string): Promise<string> => {
   if (!base64Data) return '';
   
-  try {
-    const storageRef = ref(storage, path);
-    const blob = dataURLtoBlob(base64Data); // Converte para arquivo real
-
-    // Metadata is CRITICAL for browsers to display the file as an image instead of downloading it
-    const metadata = {
-        contentType: blob.type || 'image/jpeg',
-        cacheControl: 'public, max-age=31536000' // Cache for 1 year (performance)
-    };
-
-    // Upload task using uploadBytes (Binary)
-    await uploadBytes(storageRef, blob, metadata);
-
-    // Get URL
-    const url = await getDownloadURL(storageRef);
-    return url;
-  } catch (error: any) {
-    console.error("Erro upload imagem:", error);
-    throw new Error(error.message || "Falha no upload da imagem."); 
-  }
+  // Simula um "upload" instantâneo. 
+  // Na verdade, apenas devolvemos a imagem para ser salva junto com o texto no banco de dados.
+  console.log("Bypass Storage: Usando Base64 direto no banco.");
+  return base64Data;
 };
 
 // --- AUTHENTICATION & USERS ---
 
-// Otimização: Buscar usuário específico pelo e-mail em vez de baixar todos
 export const getUserByEmail = async (email: string): Promise<User | null> => {
     try {
-        // Verificar primeiro se é o Master Hardcoded
         if (email === MASTER_USER.email) {
-             // Verificar se existe no banco para pegar dados atualizados
              const masterRef = doc(db, "users", MASTER_USER.id);
              const masterSnap = await getDoc(masterRef);
              if (masterSnap.exists()) {
@@ -122,7 +82,6 @@ export const signInWithGoogle = async (): Promise<{ user: User | null, isNewUser
         if (existingUser) {
             return { user: existingUser, isNewUser: false };
         } else {
-            // Usuário não existe no nosso banco, retornar dados para cadastro
             return { 
                 user: null, 
                 isNewUser: true, 
@@ -140,6 +99,14 @@ export const signInWithGoogle = async (): Promise<{ user: User | null, isNewUser
     }
 };
 
+export const logoutUser = async () => {
+    try {
+        await signOut(auth);
+    } catch (error) {
+        console.error("Erro ao fazer logout do Firebase:", error);
+    }
+};
+
 // --- SECURITY & LOCKING ---
 
 export const recordFailedLogin = async (user: User) => {
@@ -149,7 +116,6 @@ export const recordFailedLogin = async (user: User) => {
         
         let updates: any = { failedLoginAttempts: currentAttempts };
         
-        // If attempts >= 3, lock for 5 minutes
         if (currentAttempts >= 3) {
             updates.lockedUntil = Date.now() + 5 * 60 * 1000;
         }
@@ -164,7 +130,6 @@ export const recordFailedLogin = async (user: User) => {
 export const successfulLogin = async (user: User) => {
     try {
         const userRef = doc(db, "users", user.id);
-        // Reset counters on success
         await updateDoc(userRef, { 
             failedLoginAttempts: 0,
             lockedUntil: 0 
@@ -219,14 +184,13 @@ export const subscribeToBanned = (callback: (list: string[]) => void) => {
     const q = query(collection(db, "banned"));
     return onSnapshot(q, (snapshot) => {
         const list: string[] = [];
-        snapshot.forEach((doc) => list.push(doc.id)); // Using ID as the banned value (cpf/email)
+        snapshot.forEach((doc) => list.push(doc.id));
         callback(list);
     }, (error) => {
         console.error("Erro ao ler banidos:", error);
     });
 };
 
-// --- APP CONFIGURATION (BRANDING) ---
 export const subscribeToAppConfig = (callback: (config: AppConfig | null) => void) => {
     return onSnapshot(doc(db, "settings", "global"), (doc) => {
         if (doc.exists()) {
@@ -242,17 +206,9 @@ export const subscribeToAppConfig = (callback: (config: AppConfig | null) => voi
 export const updateAppConfig = async (config: AppConfig) => {
     try {
         const settingsRef = doc(db, "settings", "global");
-        // Check if image is Base64 and needs upload
-        let finalLogoUrl = config.logoUrl;
-        
-        if (config.logoUrl && config.logoUrl.startsWith('data:')) {
-             // Unique name is vital to prevent caching
-             finalLogoUrl = await uploadImageToFirebase(config.logoUrl, `settings/logo_${Date.now()}.png`);
-        }
-
-        const finalConfig = { ...config, logoUrl: finalLogoUrl };
-        await setDoc(settingsRef, sanitizePayload(finalConfig), { merge: true });
-        return finalConfig;
+        // Salva direto no banco (Base64 já vem no objeto)
+        await setDoc(settingsRef, sanitizePayload(config), { merge: true });
+        return config;
     } catch (error) {
         console.error("Erro ao salvar configuração:", error);
         throw error;
@@ -275,7 +231,6 @@ export const updateVendorPartial = async (vendorId: string, data: Partial<Vendor
     try {
         const vendorRef = doc(db, "vendors", vendorId);
         const cleanData = sanitizePayload(data);
-        // Use setDoc with merge: true to ensure it creates/updates regardless of previous state
         await setDoc(vendorRef, cleanData, { merge: true });
     } catch (error) {
         console.error("Erro ao atualizar vendor parcial:", error);
@@ -285,13 +240,9 @@ export const updateVendorPartial = async (vendorId: string, data: Partial<Vendor
 
 export const saveUserToFirebase = async (user: User) => {
   try {
-    // Check if image is still Base64 (Should be handled by UI, but double check)
-    if (user.photoUrl && user.photoUrl.startsWith('data:')) {
-        const url = await uploadImageToFirebase(user.photoUrl, `users/${user.id}/profile_${Date.now()}.jpg`);
-        user.photoUrl = url;
-    }
+    // Nota: user.photoUrl já contém o Base64 vindo do frontend ou a URL antiga.
+    // Não tentamos mais uploadImageToFirebase pois o Storage está desligado.
     const cleanUser = sanitizePayload(user);
-    // Use merge: true to avoid overwriting existing data if object is partial
     await setDoc(doc(db, "users", user.id), cleanUser, { merge: true });
   } catch (e: any) {
     console.error("Erro salvando user:", e);
@@ -301,10 +252,6 @@ export const saveUserToFirebase = async (user: User) => {
 
 export const saveVendorToFirebase = async (vendor: Vendor) => {
   try {
-    if (vendor.photoUrl && vendor.photoUrl.startsWith('data:')) {
-        const url = await uploadImageToFirebase(vendor.photoUrl, `vendors/${vendor.id}/cover_${Date.now()}.jpg`);
-        vendor.photoUrl = url;
-    }
     const cleanVendor = sanitizePayload(vendor);
     await setDoc(doc(db, "vendors", vendor.id), cleanVendor, { merge: true });
   } catch (e: any) {
@@ -350,12 +297,10 @@ export const unbanItemInFirebase = async (value: string) => {
     }
 };
 
-// Setup Initial Data (Populate Firebase if empty)
 export const seedInitialData = async () => {
-    if (localStorage.getItem('app_seeded_v8') === 'true') {
+    if (localStorage.getItem('app_seeded_v9') === 'true') {
         return;
     }
-
     try {
         const masterRef = doc(db, "users", MASTER_USER.id);
         const masterSnap = await getDoc(masterRef);
@@ -365,7 +310,7 @@ export const seedInitialData = async () => {
             const cleanMaster = sanitizePayload(MASTER_USER);
             await setDoc(masterRef, cleanMaster);
         }
-        localStorage.setItem('app_seeded_v8', 'true');
+        localStorage.setItem('app_seeded_v9', 'true');
     } catch (error) {
         console.error("Error seeding initial data:", error);
     }

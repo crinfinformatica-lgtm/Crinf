@@ -2,7 +2,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
 
 // Configuração do Firebase fornecida pelo usuário
 const firebaseConfig = {
@@ -18,6 +17,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Export services for usage in the app
+// REMOVIDO: export const storage = getStorage(app); 
+// Não usamos mais o Storage pago, salvaremos imagens direto no Firestore (DB)
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const storage = getStorage(app);

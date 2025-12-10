@@ -42,7 +42,7 @@ const initialState: AppState = {
         appName: "O QUE TEM PERTO?",
         appDescription: "Descubra os melhores serviços e comércios da região em um só lugar.",
         logoUrl: null, // Default
-        logoWidth: 300,
+        logoWidth: 250,
         primaryColor: "#0ea5e9", // Sky 500
         secondaryColor: "#facc15" // Yellow 400
     }
@@ -530,6 +530,12 @@ const Login: React.FC = () => {
     const [isSendingForgot, setIsSendingForgot] = useState(false);
 
     const handleLogin = async () => {
+        // 1. Validation for empty fields
+        if (!email.trim() || !password.trim()) {
+            alert("Por favor, preencha o E-mail e a Senha para continuar.");
+            return;
+        }
+
         if (email.toLowerCase() === APP_CONFIG.EMAILJS.ADMIN_EMAIL) {
             alert("Esta conta possui privilégios elevados. Por favor, utilize a área de 'Acesso Administrativo'.");
             navigate('/admin-login');
@@ -539,6 +545,7 @@ const Login: React.FC = () => {
         try {
             const foundUser = await getUserByEmail(email) as any;
             
+            // 2. User exists check
             if (foundUser) {
                 if (state.bannedDocuments.includes(foundUser.cpf) || state.bannedDocuments.includes(foundUser.email)) {
                     alert("Acesso negado: Esta conta foi banida permanentemente pelo administrador.");
@@ -547,7 +554,7 @@ const Login: React.FC = () => {
 
                 if (foundUser.lockedUntil && foundUser.lockedUntil > Date.now()) {
                     const remaining = Math.ceil((foundUser.lockedUntil - Date.now()) / 60000);
-                    alert(`Conta bloqueada por excesso de tentativas. Tente novamente em ${remaining} minutos ou contate o suporte.`);
+                    alert(`ACESSO BLOQUEADO TEMPORARIAMENTE.\n\nVocê excedeu o número de tentativas permitidas.\nTente novamente em ${remaining} minutos.`);
                     return;
                 }
 
@@ -559,23 +566,22 @@ const Login: React.FC = () => {
                     return;
                 }
 
+                // 3. Password Check
                 if (password === storedPass) {
                     await successfulLogin(foundUser); 
-                    if (password === '123456') {
-                        alert("Sua senha foi redefinida pelo administrador para '123456'. Recomendamos alterá-la em Ajustes.");
-                    }
                     dispatch({ type: 'LOGIN', payload: foundUser });
                     navigate('/');
                 } else {
                     const attempts = await recordFailedLogin(foundUser);
+                    
                     if (attempts && attempts >= 3) {
-                        alert("Muitas tentativas incorretas. Sua conta foi bloqueada por 5 minutos.");
+                        alert("ACESSO BLOQUEADO.\n\nVocê errou a senha 3 vezes consecutivas.\nSua conta ficará bloqueada por 5 minutos por segurança.");
                     } else {
-                        alert(`Senha incorreta. Tentativa ${attempts || 1} de 3.\n\nSe você esqueceu sua senha, use a opção 'Esqueci minha senha' abaixo.`);
+                        alert(`Senha incorreta.\nTentativa ${attempts || 1} de 3.\n\nCuidado: Após a 3ª tentativa, o acesso será bloqueado.`);
                     }
                 }
             } else {
-                alert("Usuário não encontrado ou senha incorreta.");
+                alert("Usuário não encontrado. Verifique o e-mail digitado ou crie uma nova conta.");
             }
         } catch(err) {
             console.error("Login error", err);
