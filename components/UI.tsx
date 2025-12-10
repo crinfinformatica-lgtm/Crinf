@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Star, MapPin, Phone, MessageCircle, X, ShieldCheck, Smartphone, Mail, Share2, Copy, Check, ZoomIn, Move, Save, Upload, Link as LinkIcon, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { Star, MapPin, Phone, MessageCircle, X, ShieldCheck, Smartphone, Mail, Share2, Copy, Check, ZoomIn, Move, Save, Upload, Link as LinkIcon, Image as ImageIcon, AlertCircle, Crown } from 'lucide-react';
 import { Vendor, AppConfig } from '../types';
 import { signInWithGoogle } from '../services/firebaseService';
 import { useAppContext } from '../App';
@@ -474,6 +474,9 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
 export const VendorCard: React.FC<{ vendor: Vendor; onClick: () => void }> = ({ vendor, onClick }) => {
   const [isShareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  
+  // Check if highlighted
+  const isFeatured = vendor.featuredUntil && vendor.featuredUntil > Date.now();
 
   const handleShareClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -501,7 +504,7 @@ export const VendorCard: React.FC<{ vendor: Vendor; onClick: () => void }> = ({ 
     <>
       <div 
         onClick={onClick}
-        className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all cursor-pointer mb-4 relative group"
+        className={`bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-all cursor-pointer mb-4 relative group ${isFeatured ? 'border-2 border-amber-300 ring-2 ring-amber-100/50' : 'border border-gray-100'}`}
       >
         <div className="relative h-32 bg-gray-200">
           <img src={vendor.photoUrl} alt={vendor.name} className="w-full h-full object-cover" />
@@ -518,9 +521,12 @@ export const VendorCard: React.FC<{ vendor: Vendor; onClick: () => void }> = ({ 
             <Share2 size={16} />
           </button>
         </div>
-        <div className="p-4">
+        <div className={`p-4 ${isFeatured ? 'bg-amber-50/30' : ''}`}>
           <div className="flex justify-between items-start mb-1">
-            <h3 className="font-bold text-gray-900 text-lg truncate pr-2">{vendor.name}</h3>
+            <div className="flex items-center gap-1.5 pr-2">
+                <h3 className="font-bold text-gray-900 text-lg truncate">{vendor.name}</h3>
+                {isFeatured && <Crown size={16} className="text-amber-500 fill-amber-500 flex-shrink-0" />}
+            </div>
           </div>
           <p className="text-xs text-primary font-medium mb-2 uppercase tracking-wide">
             {vendor.categories[0]}

@@ -60,6 +60,7 @@ export const Home: React.FC = () => {
     }
   };
 
+  // 1. FILTER
   const filteredVendors = state.vendors.filter(v => {
     const matchesCategory = state.selectedCategory 
       ? v.categories.some(c => c.toLowerCase().includes(state.selectedCategory!.toLowerCase()))
@@ -76,6 +77,22 @@ export const Home: React.FC = () => {
         : (v.distance !== undefined && v.distance <= maxDistance);
 
     return matchesCategory && matchesSearch && matchesDistance;
+  });
+
+  // 2. SORT (Featured First)
+  const sortedVendors = filteredVendors.sort((a, b) => {
+      // Check if featured and valid
+      const isAFeatured = a.featuredUntil && a.featuredUntil > Date.now();
+      const isBFeatured = b.featuredUntil && b.featuredUntil > Date.now();
+
+      if (isAFeatured && !isBFeatured) return -1; // A comes first
+      if (!isAFeatured && isBFeatured) return 1;  // B comes first
+      
+      // If both featured or both not, sort by distance (if available) or existing order
+      if (a.distance !== undefined && b.distance !== undefined) {
+          return a.distance - b.distance;
+      }
+      return 0;
   });
 
   const goHome = () => {
@@ -100,7 +117,13 @@ export const Home: React.FC = () => {
                     <AppLogo />
                 </div>
                 
-                <p className="text-gray-500 mb-10 text-sm max-w-xs mx-auto font-medium">
+                <p 
+                    className="mb-10 text-sm max-w-xs mx-auto font-medium" 
+                    style={{ 
+                        color: state.appConfig.descriptionColor || '#6b7280', 
+                        whiteSpace: 'pre-wrap' 
+                    }}
+                >
                     {state.appConfig.appDescription || "Descubra os melhores serviços e comércios da região em um só lugar."}
                 </p>
                 
@@ -248,7 +271,7 @@ export const Home: React.FC = () => {
             )}
         </div>
         
-        {filteredVendors.length === 0 ? (
+        {sortedVendors.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-3xl border border-sky-100 p-8 shadow-sm mx-2">
             <div className="bg-sky-50 rounded-full h-20 w-20 flex items-center justify-center mx-auto mb-4">
                 <Search className="text-primary" size={32}/>
@@ -265,7 +288,7 @@ export const Home: React.FC = () => {
             }}>Limpar Filtros</Button>
           </div>
         ) : (
-          filteredVendors.map(vendor => (
+          sortedVendors.map(vendor => (
             <VendorCard 
               key={vendor.id} 
               vendor={vendor} 

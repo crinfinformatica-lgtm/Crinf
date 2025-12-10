@@ -41,6 +41,7 @@ const initialState: AppState = {
     appConfig: {
         appName: "O QUE TEM PERTO?",
         appDescription: "Descubra os melhores serviços e comércios da região em um só lugar.",
+        descriptionColor: "#64748b", // Default Slate-500
         logoUrl: null, // Default
         logoWidth: 250,
         primaryColor: "#0ea5e9", // Sky 500

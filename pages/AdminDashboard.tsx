@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock, Mail, Smartphone, Palette, Upload, X, ZoomIn, RefreshCw, Save, Download } from 'lucide-react';
+import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock, Mail, Smartphone, Palette, Upload, X, ZoomIn, RefreshCw, Save, Download, Crown, Zap } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Button, Input, Modal, TwoFactorModal, PhotoSelector, ImageCropper, AppLogo } from '../components/UI';
 import { UserType, User as IUser, Vendor, AppConfig } from '../types';
-import { subscribeToUsers, updateAppConfig } from '../services/firebaseService';
+import { subscribeToUsers, updateAppConfig, updateVendorPartial } from '../services/firebaseService';
 import { APP_CONFIG } from '../config';
 
 export const AdminDashboard: React.FC = () => {
@@ -19,6 +19,10 @@ export const AdminDashboard: React.FC = () => {
   // Editing state
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+
+  // Highlight State
+  const [isHighlightModalOpen, setHighlightModalOpen] = useState(false);
+  const [highlightingVendor, setHighlightingVendor] = useState<Vendor | null>(null);
 
   // Create User State
   const [isCreateUserModalOpen, setCreateUserModalOpen] = useState(false);
@@ -185,6 +189,39 @@ export const AdminDashboard: React.FC = () => {
       setEditAddress(item.address);
       setEditType(item.type || UserType.USER);
       setEditModalOpen(true);
+  };
+
+  const openHighlightModal = (vendor: Vendor) => {
+      setHighlightingVendor(vendor);
+      setHighlightModalOpen(true);
+  };
+
+  const applyHighlight = async (days: number) => {
+      if (!highlightingVendor) return;
+
+      let timestamp = 0;
+      if (days > 0) {
+          timestamp = Date.now() + (days * 24 * 60 * 60 * 1000);
+      }
+
+      try {
+          // Update via Firebase Service
+          await updateVendorPartial(highlightingVendor.id, { featuredUntil: timestamp });
+          
+          // Update Local State
+          const updatedVendor = { ...highlightingVendor, featuredUntil: timestamp };
+          dispatch({ type: 'UPDATE_VENDOR', payload: updatedVendor });
+          
+          dispatch({ 
+            type: 'ADD_SECURITY_LOG', 
+            payload: { action: 'FEATURE_VENDOR', details: `Destaque aplicado para ${highlightingVendor.name} por ${days} dias.` } 
+          });
+
+          alert(days > 0 ? "Destaque aplicado com sucesso!" : "Destaque removido.");
+          setHighlightModalOpen(false);
+      } catch (error: any) {
+          alert("Erro ao aplicar destaque: " + error.message);
+      }
   };
 
   const saveEdit = () => {
@@ -395,6 +432,7 @@ export const AdminDashboard: React.FC = () => {
           const defaultConfig = {
               appName: "O QUE TEM PERTO?",
               appDescription: "Descubra os melhores serviços e comércios da região em um só lugar.",
+              descriptionColor: "#64748b",
               logoUrl: null,
               logoWidth: 300,
               primaryColor: "#0ea5e9",
@@ -450,8 +488,10 @@ export const AdminDashboard: React.FC = () => {
                     <g transform="translate(25, 30)">
                         <circle r="19" fill="white" stroke="${tempConfig.secondaryColor}" stroke-width="3" filter="url(#shadow)"/>
                         <g transform="translate(-10, -10) scale(0.8)">
-                            <path d="M2 9a3 3 0 0 1 0-6h20a3 3 0 0 1 0 6v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9Z" fill="${tempConfig.secondaryColor}"/>
-                            <path d="M1 5h22v4H1z" fill="${tempConfig.secondaryColor}" fill-opacity="0.8"/>
+                            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" fill="${tempConfig.secondaryColor}" opacity="0.2"/>
+                            <path d="M16 10a4 4 0 0 1-8 0" stroke="${tempConfig.secondaryColor}" stroke-width="3" fill="none" stroke-linecap="round"/>
+                            <path d="M3 6h18" stroke="${tempConfig.secondaryColor}" stroke-width="2"/>
+                            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4H6z" stroke="${tempConfig.secondaryColor}" stroke-width="2" fill="none"/>
                         </g>
                     </g>
 
@@ -507,6 +547,7 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <div className="animate-fade-in mt-4 border-t border-gray-100 pt-6">
+      {/* ... Header and Tabs ... */}
       <div className="flex items-center gap-3 mb-4 px-2">
           <div className="bg-sky-100 p-2 rounded-lg">
              <ShieldAlert className="text-sky-700" size={24} />
@@ -517,7 +558,6 @@ export const AdminDashboard: React.FC = () => {
           </div>
       </div>
 
-      {/* Navigation Tabs */}
       <div className="flex gap-2 flex-wrap pb-2 mb-4">
             {[
                 { id: 'users', icon: User, label: 'Usuários' },
@@ -543,6 +583,7 @@ export const AdminDashboard: React.FC = () => {
         {/* USERS TAB */}
         {activeTab === 'users' && (
             <div className="space-y-4 animate-fade-in">
+                {/* ... User List ... */}
                 <div className="flex justify-between items-center mb-2">
                     <h3 className="font-bold text-gray-700">Gestão de Usuários</h3>
                     <Button onClick={() => setCreateUserModalOpen(true)} className="py-1 px-3 text-xs h-auto gap-1">
@@ -606,24 +647,37 @@ export const AdminDashboard: React.FC = () => {
             <div className="space-y-4 animate-fade-in">
                 <h3 className="font-bold text-gray-700 mb-2">Gestão de Comércios</h3>
                 <div className="space-y-3">
-                    {state.vendors.map(vendor => (
-                        <div key={vendor.id} className="bg-white p-3 rounded-xl shadow-sm border border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                    {state.vendors.map(vendor => {
+                        const isFeatured = vendor.featuredUntil && vendor.featuredUntil > Date.now();
+                        return (
+                        <div key={vendor.id} className={`bg-white p-3 rounded-xl shadow-sm border flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 ${isFeatured ? 'border-amber-300 bg-amber-50' : 'border-gray-200'}`}>
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden">
                                     <img src={vendor.photoUrl} alt={vendor.name} className="w-full h-full object-cover" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-sm text-gray-800">{vendor.name}</h3>
+                                    <h3 className="font-bold text-sm text-gray-800 flex items-center gap-1">
+                                        {vendor.name}
+                                        {isFeatured && <Crown size={12} className="text-amber-500 fill-amber-500" />}
+                                    </h3>
                                     <p className="text-xs text-gray-500">{vendor.categories.join(', ')}</p>
                                     <div className="flex gap-2 mt-1">
                                          <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-100">
                                             {vendor.subtype === 'SERVICE' ? 'Serviço' : 'Comércio'}
                                          </span>
-                                         <span className="text-[10px] text-gray-400">{vendor.document}</span>
+                                         <span className="text-xs text-gray-400">{vendor.document}</span>
                                     </div>
+                                    {isFeatured && (
+                                        <p className="text-[10px] text-amber-600 font-bold mt-1">
+                                            Destaque até: {new Date(vendor.featuredUntil!).toLocaleDateString()}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex gap-2 justify-end">
+                                <button onClick={() => openHighlightModal(vendor)} className={`p-2 rounded-lg ${isFeatured ? 'text-amber-600 bg-amber-100' : 'text-gray-400 hover:text-amber-500 hover:bg-amber-50'}`} title="Destacar / Promover">
+                                    <Crown size={16} />
+                                </button>
                                 <button onClick={() => openEditModal(vendor, 'vendor')} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg">
                                     <Edit2 size={16} />
                                 </button>
@@ -639,14 +693,15 @@ export const AdminDashboard: React.FC = () => {
                                 )}
                             </div>
                         </div>
-                    ))}
+                    )})}
                 </div>
             </div>
         )}
-
-        {/* BLOCKED USERS TAB */}
+        
+        {/* ... Other Tabs (Blocked, Banned, Security, Customization, Distribute) ... */}
         {activeTab === 'blocked' && (
              <div className="space-y-4 animate-fade-in">
+                {/* ... Blocked Content ... */}
                 <div className="bg-red-50 p-3 rounded-lg border border-red-200 mb-4">
                     <h3 className="text-sm font-bold text-red-800 flex items-center gap-2">
                         <Lock size={16} /> Contas Bloqueadas Temporariamente
@@ -682,9 +737,9 @@ export const AdminDashboard: React.FC = () => {
              </div>
         )}
 
-        {/* BANNED TAB */}
         {activeTab === 'banned' && (
             <div className="space-y-4 animate-fade-in">
+                 {/* ... Banned Content ... */}
                  <div className="flex justify-between items-center">
                     <h3 className="font-bold text-gray-700">Lista Negra (Banidos)</h3>
                     <Button onClick={() => setBanModalOpen(true)} className="py-1 px-3 text-xs h-auto bg-red-600 hover:bg-red-700 shadow-none text-white">
@@ -708,10 +763,9 @@ export const AdminDashboard: React.FC = () => {
             </div>
         )}
 
-        {/* SECURITY TAB */}
         {activeTab === 'security' && (
              <div className="space-y-6 animate-fade-in">
-                 {/* Master Password Change */}
+                 {/* ... Security Content ... */}
                  <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                      <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
                          <KeyRound size={18} className="text-purple-600" /> 
@@ -725,7 +779,6 @@ export const AdminDashboard: React.FC = () => {
                      </div>
                  </div>
 
-                 {/* Security Logs */}
                  <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                      <div className="flex justify-between items-center mb-4">
                          <h3 className="font-bold text-gray-800 flex items-center gap-2">
@@ -756,7 +809,6 @@ export const AdminDashboard: React.FC = () => {
                      </div>
                  </div>
 
-                 {/* Database Reset */}
                  <div className="bg-red-50 p-4 rounded-xl border border-red-200">
                      <h3 className="font-bold text-red-800 mb-2 flex items-center gap-2">
                          <Database size={18} /> Zona de Perigo
@@ -771,9 +823,9 @@ export const AdminDashboard: React.FC = () => {
              </div>
         )}
         
-        {/* CUSTOMIZATION TAB */}
         {activeTab === 'customization' && (
             <div className="space-y-6 animate-fade-in">
+                {/* ... Customization Content ... */}
                 <div className="bg-white p-4 rounded-xl border border-gray-200">
                      <div className="flex justify-between items-center mb-4">
                         <h3 className="font-bold text-gray-800 flex items-center gap-2">
@@ -791,13 +843,13 @@ export const AdminDashboard: React.FC = () => {
                             onChange={e => setTempConfig({...tempConfig, appName: e.target.value})} 
                          />
                          <Input 
-                            label="Descrição / Slogan" 
+                            label="Descrição / Slogan (Aceita várias linhas)" 
                             value={tempConfig.appDescription} 
                             onChange={e => setTempConfig({...tempConfig, appDescription: e.target.value})} 
-                            placeholder="Ex: O melhor guia da cidade"
+                            placeholder="Ex: O melhor guia da cidade\nBaixe agora!"
+                            multiline
                          />
 
-                         {/* Logo Upload */}
                          <div>
                              <label className="block text-sm font-medium text-gray-700 mb-2">Logo do App</label>
                              <PhotoSelector 
@@ -807,7 +859,6 @@ export const AdminDashboard: React.FC = () => {
                              />
                          </div>
 
-                         {/* Size Slider */}
                          <div>
                              <label className="block text-sm font-medium text-gray-700 mb-1">
                                  Tamanho da Logo: {tempConfig.logoWidth}px
@@ -822,7 +873,6 @@ export const AdminDashboard: React.FC = () => {
                              />
                          </div>
 
-                         {/* Colors */}
                          <div className="grid grid-cols-2 gap-4">
                              <div>
                                  <label className="block text-sm font-medium text-gray-700 mb-1">Cor Primária</label>
@@ -848,17 +898,34 @@ export const AdminDashboard: React.FC = () => {
                                      <span className="text-xs text-gray-500 font-mono">{tempConfig.secondaryColor}</span>
                                  </div>
                              </div>
+                             <div className="col-span-2">
+                                 <label className="block text-sm font-medium text-gray-700 mb-1">Cor da Descrição/Slogan</label>
+                                 <div className="flex items-center gap-2">
+                                     <input 
+                                        type="color" 
+                                        value={tempConfig.descriptionColor || '#64748b'}
+                                        onChange={e => setTempConfig({...tempConfig, descriptionColor: e.target.value})}
+                                        className="h-10 w-10 rounded cursor-pointer border-0"
+                                     />
+                                     <span className="text-xs text-gray-500 font-mono">{tempConfig.descriptionColor || '#64748b'}</span>
+                                 </div>
+                             </div>
                          </div>
                      </div>
                 </div>
 
-                {/* Preview Section */}
                 <div className="border border-gray-200 rounded-3xl overflow-hidden relative shadow-xl bg-sky-50 aspect-[9/16] max-w-xs mx-auto flex flex-col">
                     <div className="bg-white/80 backdrop-blur-md p-4 pt-8 text-center border-b border-sky-100">
                          <div className="transform origin-top transition-all duration-300">
                              <AppLogo config={tempConfig} />
                          </div>
-                         <p className="text-[10px] text-gray-500 mt-4 px-4 font-medium">
+                         <p 
+                            className="text-[10px] mt-4 px-4 font-medium"
+                            style={{ 
+                                color: tempConfig.descriptionColor || '#6b7280',
+                                whiteSpace: 'pre-wrap'
+                            }}
+                         >
                             {tempConfig.appDescription}
                          </p>
                     </div>
@@ -874,7 +941,6 @@ export const AdminDashboard: React.FC = () => {
                         </div>
                     </div>
                     
-                    {/* Floating Save Button */}
                     <div className="absolute bottom-4 left-0 right-0 px-4">
                         <Button fullWidth onClick={handleSaveConfig} disabled={isSavingConfig} icon={<Save size={18} />}>
                             {isSavingConfig ? 'Aplicando...' : 'Salvar Alterações'}
@@ -882,7 +948,6 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* --- DOWNLOAD BUTTON ADDED HERE --- */}
                 <div className="text-center pb-4">
                     <p className="text-xs text-gray-400 mb-2">Precisa da logo para marketing?</p>
                     <Button 
@@ -898,9 +963,9 @@ export const AdminDashboard: React.FC = () => {
             </div>
         )}
 
-        {/* DISTRIBUTION TAB */}
         {activeTab === 'distribute' && (
             <div className="space-y-6 animate-fade-in text-center">
+                 {/* ... Distribute Content ... */}
                  <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                      <div className="bg-sky-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                          <Share2 size={32} className="text-sky-600" />
@@ -938,7 +1003,9 @@ export const AdminDashboard: React.FC = () => {
 
       </div>
 
-      {/* Edit Modal */}
+      {/* MODALS */}
+      
+      {/* Edit User Modal */}
       <Modal isOpen={isEditModalOpen} onClose={() => setEditModalOpen(false)} title={`Editar ${editingItem?.dataType === 'user' ? 'Usuário' : 'Comércio'}`}>
           <div className="space-y-4">
               <Input label="Nome" value={editName} onChange={e => setEditName(e.target.value)} />
@@ -989,6 +1056,39 @@ export const AdminDashboard: React.FC = () => {
                   A senha padrão será <strong>123</strong>. O usuário deve alterá-la no primeiro acesso.
               </p>
               <Button fullWidth onClick={handleCreateUser}>Criar Usuário</Button>
+          </div>
+      </Modal>
+
+      {/* Highlight Vendor Modal */}
+      <Modal isOpen={isHighlightModalOpen} onClose={() => setHighlightModalOpen(false)} title="Destacar Comércio">
+          <div className="space-y-4 text-center">
+              <div className="bg-amber-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <Crown size={32} className="text-amber-500" />
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                  Promover <strong>{highlightingVendor?.name}</strong> para o topo da lista.
+              </p>
+              
+              <div className="grid grid-cols-1 gap-3">
+                  <button onClick={() => applyHighlight(2)} className="bg-white border border-gray-200 p-3 rounded-xl hover:bg-amber-50 hover:border-amber-300 flex justify-between items-center group">
+                       <span className="font-bold text-gray-700 group-hover:text-amber-700">2 Dias</span>
+                       <Zap size={16} className="text-gray-300 group-hover:text-amber-500" />
+                  </button>
+                  <button onClick={() => applyHighlight(7)} className="bg-white border border-gray-200 p-3 rounded-xl hover:bg-amber-50 hover:border-amber-300 flex justify-between items-center group">
+                       <span className="font-bold text-gray-700 group-hover:text-amber-700">1 Semana</span>
+                       <Zap size={16} className="text-gray-300 group-hover:text-amber-500" />
+                  </button>
+                  <button onClick={() => applyHighlight(30)} className="bg-white border border-gray-200 p-3 rounded-xl hover:bg-amber-50 hover:border-amber-300 flex justify-between items-center group">
+                       <span className="font-bold text-gray-700 group-hover:text-amber-700">1 Mês</span>
+                       <Zap size={16} className="text-gray-300 group-hover:text-amber-500" />
+                  </button>
+                  
+                  {highlightingVendor?.featuredUntil && highlightingVendor.featuredUntil > Date.now() && (
+                      <button onClick={() => applyHighlight(0)} className="mt-2 text-red-500 text-sm font-semibold hover:underline">
+                          Remover Destaque Atual
+                      </button>
+                  )}
+              </div>
           </div>
       </Modal>
 

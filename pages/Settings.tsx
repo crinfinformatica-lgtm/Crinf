@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Settings, Edit3, Upload, Heart, Share2, Bell, Moon, Lock, ChevronRight, Copy, Check, LogOut } from 'lucide-react';
+import { User, Settings, Edit3, Upload, Heart, Share2, Bell, Moon, Lock, ChevronRight, Copy, Check, LogOut, MessageSquare, Mail } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Button, Input, Modal, ImageCropper, TwoFactorModal, PhotoSelector } from '../components/UI';
 import { UserType as UserEnum, CATEGORIES } from '../types';
 import { uploadImageToFirebase, updateVendorPartial, logoutUser } from '../services/firebaseService';
 import { ALLOWED_NEIGHBORHOODS } from '../config';
+import { APP_CONFIG } from '../config';
 
 // Lazy load admin dashboard
 const AdminDashboard = React.lazy(() => import('./AdminDashboard').then(module => ({ default: module.AdminDashboard })));
@@ -35,6 +36,11 @@ export const SettingsPage: React.FC = () => {
     const [isPixCopied, setIsPixCopied] = useState(false);
     const pixKey = "crinf.negocios@gmail.com";
     
+    // Feedback State
+    const [isFeedbackOpen, setFeedbackOpen] = useState(false);
+    const [feedbackText, setFeedbackText] = useState('');
+    const [isSendingFeedback, setIsSendingFeedback] = useState(false);
+
     // Cropper State
     const [imageToCrop, setImageToCrop] = useState<string | null>(null);
     
@@ -298,6 +304,37 @@ export const SettingsPage: React.FC = () => {
         setTimeout(() => setIsPixCopied(false), 2000);
     };
 
+    const handleSendFeedback = async () => {
+        if (!feedbackText.trim()) return;
+        setIsSendingFeedback(true);
+
+        const templateParams = {
+            to_email: APP_CONFIG.EMAILJS.ADMIN_EMAIL,
+            email: state.currentUser?.email || 'Anônimo',
+            to_name: 'Admin',
+            subject: 'Novo Feedback / Sugestão do App',
+            message: `Usuário: ${state.currentUser?.name} (${state.currentUser?.email})\n\nMensagem:\n${feedbackText}`
+        };
+
+        try {
+            // @ts-ignore
+            if (window.emailjs) {
+                // @ts-ignore
+                await window.emailjs.send(APP_CONFIG.EMAILJS.SERVICE_ID, APP_CONFIG.EMAILJS.TEMPLATE_ID, templateParams, APP_CONFIG.EMAILJS.PUBLIC_KEY);
+                alert("Sua sugestão foi enviada com sucesso! Obrigado por contribuir.");
+                setFeedbackOpen(false);
+                setFeedbackText("");
+            } else {
+                throw new Error("Email Service Unavailable");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Erro ao enviar sugestão. Tente novamente mais tarde.");
+        } finally {
+            setIsSendingFeedback(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-sky-100 via-white to-sky-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 pb-24">
              <div className="bg-white dark:bg-slate-800 p-6 pb-8 shadow-sm rounded-b-[2rem] mb-6 transition-colors">
@@ -391,6 +428,18 @@ export const SettingsPage: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Feedback Button */}
+                    <div 
+                        onClick={() => setFeedbackOpen(true)}
+                        className="p-4 border-b border-gray-50 dark:border-slate-700 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700"
+                    >
+                        <div className="flex items-center gap-3">
+                            <MessageSquare size={20} className="text-gray-400" />
+                            <span className="text-gray-700 dark:text-gray-200 font-medium">Sugestões e Melhorias</span>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-300" />
+                    </div>
+
                     <div 
                         onClick={() => setDonationOpen(true)}
                         className="p-4 flex items-center justify-between cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20 group transition-colors"
@@ -440,6 +489,31 @@ export const SettingsPage: React.FC = () => {
                      <Input label="Confirmar Senha" type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} />
                      <Button fullWidth onClick={handleChangePassword}>Salvar Nova Senha</Button>
                  </div>
+             </Modal>
+
+             {/* Feedback Modal */}
+             <Modal isOpen={isFeedbackOpen} onClose={() => setFeedbackOpen(false)} title="Sugestões e Feedback">
+                <div className="space-y-4">
+                    <div className="text-center mb-4">
+                        <div className="bg-sky-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2">
+                             <Mail size={24} className="text-sky-600" />
+                        </div>
+                        <p className="text-sm text-gray-600">
+                            Encontrou um erro ou tem uma ideia para melhorar o app? Conte para nós!
+                        </p>
+                    </div>
+                    <Input 
+                        label="Sua Mensagem" 
+                        value={feedbackText} 
+                        onChange={e => setFeedbackText(e.target.value)} 
+                        multiline
+                        placeholder="Escreva sua sugestão aqui..."
+                        className="h-32"
+                    />
+                    <Button fullWidth onClick={handleSendFeedback} disabled={isSendingFeedback || !feedbackText.trim()}>
+                        {isSendingFeedback ? 'Enviando...' : 'Enviar Sugestão'}
+                    </Button>
+                </div>
              </Modal>
 
              {/* Edit Profile Modal */}

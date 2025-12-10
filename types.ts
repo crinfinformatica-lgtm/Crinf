@@ -43,6 +43,7 @@ export interface Vendor {
   type?: UserType;
   visibility: VendorVisibility; // New privacy settings
   subtype?: 'COMMERCE' | 'SERVICE';
+  featuredUntil?: number; // Timestamp: If present and > Date.now(), vendor is highlighted
 }
 
 export interface User {
@@ -68,7 +69,7 @@ export interface Location {
 export interface SecurityLog {
   id: string;
   timestamp: number;
-  action: 'LOGIN_SUCCESS' | 'LOGIN_FAIL' | 'PASSWORD_CHANGE' | 'BAN_ACTION' | 'DB_RESET' | 'UNLOCK_USER' | 'CONFIG_UPDATE';
+  action: 'LOGIN_SUCCESS' | 'LOGIN_FAIL' | 'PASSWORD_CHANGE' | 'BAN_ACTION' | 'DB_RESET' | 'UNLOCK_USER' | 'CONFIG_UPDATE' | 'FEATURE_VENDOR';
   details: string;
   ip?: string; // Simulated in frontend
 }
@@ -77,6 +78,7 @@ export interface SecurityLog {
 export interface AppConfig {
   appName: string;
   appDescription: string; // Tagline / Slogan
+  descriptionColor?: string; // Color for the description text
   logoUrl: string | null; // If null, use default SVG
   logoWidth: number; // Pixel width for the logo
   primaryColor: string; // Hex code
