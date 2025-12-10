@@ -78,7 +78,15 @@ export interface SecurityLog {
 export interface AppConfig {
   appName: string;
   appDescription: string; // Tagline / Slogan
-  descriptionColor?: string; // Color for the description text
+  
+  // Text Styling
+  descriptionColor?: string; 
+  descriptionSize?: number; // px
+  descriptionBold?: boolean;
+  descriptionItalic?: boolean;
+  descriptionUnderline?: boolean;
+  descriptionAlign?: 'left' | 'center' | 'right';
+
   logoUrl: string | null; // If null, use default SVG
   logoWidth: number; // Pixel width for the logo
   primaryColor: string; // Hex code
@@ -93,6 +101,8 @@ export interface AppState {
   bannedDocuments: string[]; // Blacklist for CPF/CNPJ
   searchQuery: string;
   selectedCategory: string | null;
+  selectedNeighborhood: string | null; // Filter by Neighborhood
+  selectedSubtype: 'ALL' | 'COMMERCE' | 'SERVICE'; // Filter by Type
   userLocation: Location | null;
   securityLogs: SecurityLog[]; // New field for security auditing
   darkMode: boolean; // Dark mode state

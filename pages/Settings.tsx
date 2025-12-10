@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Settings, Edit3, Upload, Heart, Share2, Bell, Moon, Lock, ChevronRight, Copy, Check, LogOut, MessageSquare, Mail } from 'lucide-react';
+import { User, Settings, Edit3, Upload, Heart, Share2, Bell, Moon, Lock, ChevronRight, Copy, Check, LogOut, MessageSquare, Mail, HelpCircle } from 'lucide-react';
 import { useAppContext } from '../App';
-import { Button, Input, Modal, ImageCropper, TwoFactorModal, PhotoSelector } from '../components/UI';
+import { Button, Input, Modal, ImageCropper, TwoFactorModal, PhotoSelector, TutorialModal } from '../components/UI';
 import { UserType as UserEnum, CATEGORIES } from '../types';
 import { uploadImageToFirebase, updateVendorPartial, logoutUser } from '../services/firebaseService';
 import { ALLOWED_NEIGHBORHOODS } from '../config';
@@ -40,6 +40,9 @@ export const SettingsPage: React.FC = () => {
     const [isFeedbackOpen, setFeedbackOpen] = useState(false);
     const [feedbackText, setFeedbackText] = useState('');
     const [isSendingFeedback, setIsSendingFeedback] = useState(false);
+    
+    // Tutorial State
+    const [isTutorialOpen, setTutorialOpen] = useState(false);
 
     // Cropper State
     const [imageToCrop, setImageToCrop] = useState<string | null>(null);
@@ -415,6 +418,18 @@ export const SettingsPage: React.FC = () => {
                         <ChevronRight size={16} className="text-gray-300" />
                     </div>
 
+                    {/* Tutorial Button */}
+                    <div 
+                        onClick={() => setTutorialOpen(true)}
+                        className="p-4 border-b border-gray-50 dark:border-slate-700 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700"
+                    >
+                        <div className="flex items-center gap-3">
+                            <HelpCircle size={20} className="text-gray-400" />
+                            <span className="text-gray-700 dark:text-gray-200 font-medium">Como usar o App (Tutorial)</span>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-300" />
+                    </div>
+
                     <div 
                         onClick={() => dispatch({ type: 'TOGGLE_THEME' })}
                         className="p-4 border-b border-gray-50 dark:border-slate-700 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700"
@@ -515,6 +530,9 @@ export const SettingsPage: React.FC = () => {
                     </Button>
                 </div>
              </Modal>
+
+             {/* Tutorial Modal */}
+             <TutorialModal isOpen={isTutorialOpen} onClose={() => setTutorialOpen(false)} />
 
              {/* Edit Profile Modal */}
              <Modal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} title="Editar Meus Dados">

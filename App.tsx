@@ -4,7 +4,7 @@ import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, us
 import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera, Upload, X, MapPin, Heart, Check, FileText } from 'lucide-react';
 import { AppState, Vendor, User as UserType, Location as LatLng, UserType as UserEnum, CATEGORIES, SecurityLog, AppConfig } from './types';
 import { getUserLocation, calculateDistance } from './services/geoService';
-import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo, ImageCropper, GoogleLoginButton } from './components/UI';
+import { TwoFactorModal, Modal, Input, Button, AdminLogo, AppLogo, ImageCropper, GoogleLoginButton, TutorialModal } from './components/UI';
 import { subscribeToVendors, subscribeToBanned, subscribeToAppConfig, saveUserToFirebase, saveVendorToFirebase, deleteUserFromFirebase, deleteVendorFromFirebase, banItemInFirebase, unbanItemInFirebase, seedInitialData, recordFailedLogin, successfulLogin, unlockUserAccount, getUserByEmail } from './services/firebaseService';
 import { APP_CONFIG } from './config';
 
@@ -35,6 +35,8 @@ const initialState: AppState = {
     bannedDocuments: [],
     searchQuery: '',
     selectedCategory: null,
+    selectedNeighborhood: null,
+    selectedSubtype: 'ALL',
     userLocation: null,
     securityLogs: [],
     darkMode: localStorage.getItem('theme') === 'dark',
@@ -42,6 +44,11 @@ const initialState: AppState = {
         appName: "O QUE TEM PERTO?",
         appDescription: "Descubra os melhores serviços e comércios da região em um só lugar.",
         descriptionColor: "#64748b", // Default Slate-500
+        descriptionSize: 14,
+        descriptionAlign: 'center',
+        descriptionBold: false,
+        descriptionItalic: false,
+        descriptionUnderline: false,
         logoUrl: null, // Default
         logoWidth: 250,
         primaryColor: "#0ea5e9", // Sky 500
@@ -66,6 +73,8 @@ type Action =
   | { type: 'LOGOUT' }
   | { type: 'SET_SEARCH'; payload: string }
   | { type: 'SET_CATEGORY'; payload: string | null }
+  | { type: 'SET_NEIGHBORHOOD'; payload: string | null }
+  | { type: 'SET_SUBTYPE'; payload: 'ALL' | 'COMMERCE' | 'SERVICE' }
   | { type: 'ADD_REVIEW'; payload: { vendorId: string; review: any } }
   | { type: 'REPLY_REVIEW'; payload: { vendorId: string; reviewId: string; replyText: string } }
   | { type: 'SET_LOCATION'; payload: LatLng }
@@ -135,6 +144,12 @@ const reducer = (state: AppState, action: Action): AppState => {
       break;
     case 'SET_CATEGORY':
       newState = { ...state, selectedCategory: action.payload };
+      break;
+    case 'SET_NEIGHBORHOOD':
+      newState = { ...state, selectedNeighborhood: action.payload };
+      break;
+    case 'SET_SUBTYPE':
+      newState = { ...state, selectedSubtype: action.payload };
       break;
     case 'SET_LOCATION':
       newState = { ...state, userLocation: action.payload };
@@ -734,11 +749,24 @@ const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
 // --- Main App ---
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
      console.log("Inicializando Firebase...");
      seedInitialData();
+     
+     // Check if first time visiting
+     const hasSeenTutorial = localStorage.getItem('hasSeenTutorial_v1');
+     if (!hasSeenTutorial) {
+         // Add a small delay for smoother UX
+         setTimeout(() => setShowTutorial(true), 1000);
+     }
   }, []);
+
+  const closeTutorial = () => {
+      setShowTutorial(false);
+      localStorage.setItem('hasSeenTutorial_v1', 'true');
+  };
 
   // Update HTML class for dark mode
   useEffect(() => {
@@ -765,9 +793,6 @@ export default function App() {
       if (state.appConfig) {
           root.style.setProperty('--app-primary', state.appConfig.primaryColor);
           root.style.setProperty('--app-secondary', state.appConfig.secondaryColor);
-          
-          // Note: Full Tailwind override requires different config, 
-          // but we can use these vars in inline styles for specific elements
       }
   }, [state.appConfig]);
 
@@ -830,6 +855,10 @@ export default function App() {
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </Suspense>
+            
+            {/* Global Tutorial Modal */}
+            <TutorialModal isOpen={showTutorial} onClose={closeTutorial} />
+
         </Layout>
       </HashRouter>
     </AppContext.Provider>

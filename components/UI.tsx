@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Star, MapPin, Phone, MessageCircle, X, ShieldCheck, Smartphone, Mail, Share2, Copy, Check, ZoomIn, Move, Save, Upload, Link as LinkIcon, Image as ImageIcon, AlertCircle, Crown } from 'lucide-react';
+import { Star, MapPin, Phone, MessageCircle, X, ShieldCheck, Smartphone, Mail, Share2, Copy, Check, ZoomIn, Move, Save, Upload, Link as LinkIcon, Image as ImageIcon, AlertCircle, Crown, Search, Store, Navigation, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Vendor, AppConfig } from '../types';
 import { signInWithGoogle } from '../services/firebaseService';
 import { useAppContext } from '../App';
@@ -337,6 +337,93 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
       </div>
     </div>
   );
+};
+
+// --- Tutorial Modal ---
+interface TutorialModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+export const TutorialModal: React.FC<TutorialModalProps> = ({ isOpen, onClose }) => {
+    const [step, setStep] = useState(0);
+
+    const steps = [
+        {
+            title: "Bem-vindo!",
+            desc: "Descubra os melhores comércios e serviços de Águas Claras e região na palma da sua mão.",
+            icon: <AppLogo customUrl={null} /> // Use default logo
+        },
+        {
+            title: "Encontre Tudo",
+            desc: "Use a barra de busca ou navegue pelas categorias. Você pode filtrar por bairro, distância ou tipo de negócio.",
+            icon: <Search size={64} className="text-sky-500" />
+        },
+        {
+            title: "Cadastre seu Negócio",
+            desc: "Tem um comércio ou presta serviço? Clique em 'Cadastrar' e divulgue seu trabalho gratuitamente para a região.",
+            icon: <Store size={64} className="text-sky-500" />
+        },
+        {
+            title: "Tudo Perto de Você",
+            desc: "Ative sua localização para ver a distância exata até os estabelecimentos. Tudo pensado para facilitar sua vida.",
+            icon: <Navigation size={64} className="text-green-500" />
+        }
+    ];
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-sky-900/90 backdrop-blur-md animate-fade-in">
+            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-slide-up p-8 text-center relative">
+                
+                <div className="absolute top-4 right-4 text-gray-300">
+                     {step + 1} / {steps.length}
+                </div>
+
+                <div className="h-40 flex items-center justify-center mb-6">
+                    {steps[step].icon}
+                </div>
+                
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">{steps[step].title}</h2>
+                <p className="text-gray-600 mb-8 leading-relaxed">
+                    {steps[step].desc}
+                </p>
+
+                <div className="flex gap-3">
+                    {step > 0 && (
+                        <button 
+                            onClick={() => setStep(step - 1)}
+                            className="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-200 transition"
+                        >
+                            <ArrowLeft className="mx-auto" size={20} />
+                        </button>
+                    )}
+                    
+                    <button 
+                        onClick={() => {
+                            if (step < steps.length - 1) {
+                                setStep(step + 1);
+                            } else {
+                                onClose();
+                            }
+                        }}
+                        className="flex-[2] bg-primary text-white font-bold py-3 rounded-xl hover:bg-sky-600 transition flex items-center justify-center gap-2 shadow-lg shadow-sky-200"
+                    >
+                        {step < steps.length - 1 ? (
+                            <>Próximo <ArrowRight size={20} /></>
+                        ) : (
+                            "Começar a Usar"
+                        )}
+                    </button>
+                </div>
+                
+                <button onClick={onClose} className="mt-4 text-xs text-gray-400 font-medium hover:text-gray-600">
+                    Pular Tutorial
+                </button>
+            </div>
+        </div>
+    );
 };
 
 // --- Image Cropper ---

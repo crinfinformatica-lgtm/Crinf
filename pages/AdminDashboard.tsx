@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock, Mail, Smartphone, Palette, Upload, X, ZoomIn, RefreshCw, Save, Download, Crown, Zap } from 'lucide-react';
+import { User, Store, Trash2, Edit2, Plus, Gavel, Ban, Share2, Check, ShoppingBag, Globe, Copy, Github, AlertTriangle, KeyRound, Lock, ShieldAlert, History, Database, Unlock, Mail, Smartphone, Palette, Upload, X, ZoomIn, RefreshCw, Save, Download, Crown, Zap, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Type } from 'lucide-react';
 import { useAppContext } from '../App';
 import { Button, Input, Modal, TwoFactorModal, PhotoSelector, ImageCropper, AppLogo } from '../components/UI';
 import { UserType, User as IUser, Vendor, AppConfig } from '../types';
@@ -429,10 +429,15 @@ export const AdminDashboard: React.FC = () => {
 
   const handleResetConfig = () => {
       if (confirm("Voltar para a identidade padrão?")) {
-          const defaultConfig = {
+          const defaultConfig: AppConfig = {
               appName: "O QUE TEM PERTO?",
               appDescription: "Descubra os melhores serviços e comércios da região em um só lugar.",
               descriptionColor: "#64748b",
+              descriptionSize: 14,
+              descriptionAlign: 'center',
+              descriptionBold: false,
+              descriptionItalic: false,
+              descriptionUnderline: false,
               logoUrl: null,
               logoWidth: 300,
               primaryColor: "#0ea5e9",
@@ -698,10 +703,10 @@ export const AdminDashboard: React.FC = () => {
             </div>
         )}
         
-        {/* ... Other Tabs (Blocked, Banned, Security, Customization, Distribute) ... */}
+        {/* ... Other Tabs ... */}
+        {/* Reuse existing tabs but ensure Customization is updated */}
         {activeTab === 'blocked' && (
              <div className="space-y-4 animate-fade-in">
-                {/* ... Blocked Content ... */}
                 <div className="bg-red-50 p-3 rounded-lg border border-red-200 mb-4">
                     <h3 className="text-sm font-bold text-red-800 flex items-center gap-2">
                         <Lock size={16} /> Contas Bloqueadas Temporariamente
@@ -739,7 +744,6 @@ export const AdminDashboard: React.FC = () => {
 
         {activeTab === 'banned' && (
             <div className="space-y-4 animate-fade-in">
-                 {/* ... Banned Content ... */}
                  <div className="flex justify-between items-center">
                     <h3 className="font-bold text-gray-700">Lista Negra (Banidos)</h3>
                     <Button onClick={() => setBanModalOpen(true)} className="py-1 px-3 text-xs h-auto bg-red-600 hover:bg-red-700 shadow-none text-white">
@@ -765,7 +769,6 @@ export const AdminDashboard: React.FC = () => {
 
         {activeTab === 'security' && (
              <div className="space-y-6 animate-fade-in">
-                 {/* ... Security Content ... */}
                  <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                      <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
                          <KeyRound size={18} className="text-purple-600" /> 
@@ -842,13 +845,84 @@ export const AdminDashboard: React.FC = () => {
                             value={tempConfig.appName} 
                             onChange={e => setTempConfig({...tempConfig, appName: e.target.value})} 
                          />
-                         <Input 
-                            label="Descrição / Slogan (Aceita várias linhas)" 
-                            value={tempConfig.appDescription} 
-                            onChange={e => setTempConfig({...tempConfig, appDescription: e.target.value})} 
-                            placeholder="Ex: O melhor guia da cidade\nBaixe agora!"
-                            multiline
-                         />
+                         
+                         <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Descrição / Slogan</label>
+                            
+                            {/* Toolbar */}
+                            <div className="flex flex-wrap gap-2 mb-2 bg-white p-2 rounded border border-gray-200 shadow-sm">
+                                <button 
+                                    onClick={() => setTempConfig({...tempConfig, descriptionBold: !tempConfig.descriptionBold})}
+                                    className={`p-1.5 rounded hover:bg-gray-100 ${tempConfig.descriptionBold ? 'bg-sky-100 text-sky-700' : 'text-gray-500'}`}
+                                    title="Negrito"
+                                >
+                                    <Bold size={16} />
+                                </button>
+                                <button 
+                                    onClick={() => setTempConfig({...tempConfig, descriptionItalic: !tempConfig.descriptionItalic})}
+                                    className={`p-1.5 rounded hover:bg-gray-100 ${tempConfig.descriptionItalic ? 'bg-sky-100 text-sky-700' : 'text-gray-500'}`}
+                                    title="Itálico"
+                                >
+                                    <Italic size={16} />
+                                </button>
+                                <button 
+                                    onClick={() => setTempConfig({...tempConfig, descriptionUnderline: !tempConfig.descriptionUnderline})}
+                                    className={`p-1.5 rounded hover:bg-gray-100 ${tempConfig.descriptionUnderline ? 'bg-sky-100 text-sky-700' : 'text-gray-500'}`}
+                                    title="Sublinhado"
+                                >
+                                    <Underline size={16} />
+                                </button>
+                                <div className="w-px h-6 bg-gray-200 mx-1"></div>
+                                <button 
+                                    onClick={() => setTempConfig({...tempConfig, descriptionAlign: 'left'})}
+                                    className={`p-1.5 rounded hover:bg-gray-100 ${tempConfig.descriptionAlign === 'left' ? 'bg-sky-100 text-sky-700' : 'text-gray-500'}`}
+                                    title="Esquerda"
+                                >
+                                    <AlignLeft size={16} />
+                                </button>
+                                <button 
+                                    onClick={() => setTempConfig({...tempConfig, descriptionAlign: 'center'})}
+                                    className={`p-1.5 rounded hover:bg-gray-100 ${tempConfig.descriptionAlign === 'center' || !tempConfig.descriptionAlign ? 'bg-sky-100 text-sky-700' : 'text-gray-500'}`}
+                                    title="Centro"
+                                >
+                                    <AlignCenter size={16} />
+                                </button>
+                                <button 
+                                    onClick={() => setTempConfig({...tempConfig, descriptionAlign: 'right'})}
+                                    className={`p-1.5 rounded hover:bg-gray-100 ${tempConfig.descriptionAlign === 'right' ? 'bg-sky-100 text-sky-700' : 'text-gray-500'}`}
+                                    title="Direita"
+                                >
+                                    <AlignRight size={16} />
+                                </button>
+                                <div className="w-px h-6 bg-gray-200 mx-1"></div>
+                                <div className="flex items-center gap-1">
+                                    <Type size={14} className="text-gray-400" />
+                                    <input 
+                                        type="number" 
+                                        value={tempConfig.descriptionSize || 14} 
+                                        onChange={(e) => setTempConfig({...tempConfig, descriptionSize: parseInt(e.target.value)})}
+                                        className="w-12 h-7 text-xs border border-gray-200 rounded px-1 text-center"
+                                        min="10" max="30"
+                                    />
+                                    <span className="text-xs text-gray-400">px</span>
+                                </div>
+                                <div className="ml-auto flex items-center gap-2">
+                                     <input 
+                                        type="color" 
+                                        value={tempConfig.descriptionColor || '#64748b'}
+                                        onChange={e => setTempConfig({...tempConfig, descriptionColor: e.target.value})}
+                                        className="h-6 w-6 rounded cursor-pointer border-0 p-0 overflow-hidden"
+                                     />
+                                </div>
+                            </div>
+
+                            <textarea
+                                value={tempConfig.appDescription}
+                                onChange={e => setTempConfig({...tempConfig, appDescription: e.target.value})}
+                                placeholder="Digite a descrição aqui..."
+                                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary min-h-[100px]"
+                            />
+                         </div>
 
                          <div>
                              <label className="block text-sm font-medium text-gray-700 mb-2">Logo do App</label>
@@ -898,18 +972,6 @@ export const AdminDashboard: React.FC = () => {
                                      <span className="text-xs text-gray-500 font-mono">{tempConfig.secondaryColor}</span>
                                  </div>
                              </div>
-                             <div className="col-span-2">
-                                 <label className="block text-sm font-medium text-gray-700 mb-1">Cor da Descrição/Slogan</label>
-                                 <div className="flex items-center gap-2">
-                                     <input 
-                                        type="color" 
-                                        value={tempConfig.descriptionColor || '#64748b'}
-                                        onChange={e => setTempConfig({...tempConfig, descriptionColor: e.target.value})}
-                                        className="h-10 w-10 rounded cursor-pointer border-0"
-                                     />
-                                     <span className="text-xs text-gray-500 font-mono">{tempConfig.descriptionColor || '#64748b'}</span>
-                                 </div>
-                             </div>
                          </div>
                      </div>
                 </div>
@@ -920,10 +982,15 @@ export const AdminDashboard: React.FC = () => {
                              <AppLogo config={tempConfig} />
                          </div>
                          <p 
-                            className="text-[10px] mt-4 px-4 font-medium"
+                            className="mt-4 px-4 font-medium transition-all"
                             style={{ 
                                 color: tempConfig.descriptionColor || '#6b7280',
-                                whiteSpace: 'pre-wrap'
+                                whiteSpace: 'pre-wrap',
+                                fontSize: `${tempConfig.descriptionSize || 14}px`,
+                                fontWeight: tempConfig.descriptionBold ? 'bold' : 'normal',
+                                fontStyle: tempConfig.descriptionItalic ? 'italic' : 'normal',
+                                textDecoration: tempConfig.descriptionUnderline ? 'underline' : 'none',
+                                textAlign: tempConfig.descriptionAlign || 'center'
                             }}
                          >
                             {tempConfig.appDescription}

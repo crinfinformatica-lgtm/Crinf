@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, MapPin, Filter, Store, UserPlus, Navigation, Share2, Check } from 'lucide-react';
+import { Search, MapPin, Filter, Store, UserPlus, Navigation, Share2, Check, Briefcase, ShoppingBag, Grid, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Vendor, CATEGORIES } from '../types';
 import { VendorCard, Button, AppLogo } from '../components/UI';
 import { useAppContext } from '../App';
 import { interpretSearchQuery } from '../services/geminiService';
+import { ALLOWED_NEIGHBORHOODS } from '../config';
 
 export const Home: React.FC = () => {
   const { state, dispatch } = useAppContext();
@@ -17,12 +18,12 @@ export const Home: React.FC = () => {
   // Distance Filter State: null means "All/No limit"
   const [maxDistance, setMaxDistance] = useState<number | null>(null);
 
-  // Logic to determine if we should stay in search mode if there's an active query
+  // Logic to determine if we should stay in search mode if there's an active query or filters
   useEffect(() => {
-    if (state.searchQuery || state.selectedCategory) {
+    if (state.searchQuery || state.selectedCategory || state.selectedNeighborhood || state.selectedSubtype !== 'ALL') {
         setViewMode('search');
     }
-  }, [state.searchQuery, state.selectedCategory]);
+  }, [state.searchQuery, state.selectedCategory, state.selectedNeighborhood, state.selectedSubtype]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,26 +61,38 @@ export const Home: React.FC = () => {
     }
   };
 
-  // 1. FILTER
+  // --- FILTERING LOGIC ---
   const filteredVendors = state.vendors.filter(v => {
+    // 1. Category Filter
     const matchesCategory = state.selectedCategory 
       ? v.categories.some(c => c.toLowerCase().includes(state.selectedCategory!.toLowerCase()))
       : true;
     
+    // 2. Search Text Filter
     const matchesSearch = state.searchQuery 
       ? v.name.toLowerCase().includes(state.searchQuery.toLowerCase()) || 
         v.description.toLowerCase().includes(state.searchQuery.toLowerCase())
       : true;
 
-    // Distance Filter Logic
+    // 3. Distance Filter
     const matchesDistance = maxDistance === null 
         ? true 
         : (v.distance !== undefined && v.distance <= maxDistance);
+    
+    // 4. Neighborhood Filter
+    const matchesNeighborhood = state.selectedNeighborhood
+        ? v.address.toLowerCase().includes(state.selectedNeighborhood.toLowerCase())
+        : true;
 
-    return matchesCategory && matchesSearch && matchesDistance;
+    // 5. Subtype Filter (Commerce vs Service)
+    const matchesSubtype = state.selectedSubtype === 'ALL'
+        ? true
+        : v.subtype === state.selectedSubtype;
+
+    return matchesCategory && matchesSearch && matchesDistance && matchesNeighborhood && matchesSubtype;
   });
 
-  // 2. SORT (Featured First)
+  // --- SORTING LOGIC (Featured First) ---
   const sortedVendors = filteredVendors.sort((a, b) => {
       // Check if featured and valid
       const isAFeatured = a.featuredUntil && a.featuredUntil > Date.now();
@@ -98,10 +111,21 @@ export const Home: React.FC = () => {
   const goHome = () => {
       dispatch({ type: 'SET_CATEGORY', payload: null });
       dispatch({ type: 'SET_SEARCH', payload: '' });
+      dispatch({ type: 'SET_NEIGHBORHOOD', payload: null });
+      dispatch({ type: 'SET_SUBTYPE', payload: 'ALL' });
       setLocalSearch('');
       setMaxDistance(null);
       setViewMode('landing');
   }
+
+  const clearFilters = () => {
+      dispatch({ type: 'SET_CATEGORY', payload: null });
+      dispatch({ type: 'SET_SEARCH', payload: '' });
+      dispatch({ type: 'SET_NEIGHBORHOOD', payload: null });
+      dispatch({ type: 'SET_SUBTYPE', payload: 'ALL' });
+      setLocalSearch('');
+      setMaxDistance(null);
+  };
 
   // --- VIEW: LANDING PAGE ---
   if (viewMode === 'landing') {
@@ -118,9 +142,14 @@ export const Home: React.FC = () => {
                 </div>
                 
                 <p 
-                    className="mb-10 text-sm max-w-xs mx-auto font-medium" 
+                    className="mb-10 max-w-xs mx-auto transition-all" 
                     style={{ 
                         color: state.appConfig.descriptionColor || '#6b7280', 
+                        fontSize: `${state.appConfig.descriptionSize || 14}px`,
+                        fontWeight: state.appConfig.descriptionBold ? 'bold' : 'normal',
+                        fontStyle: state.appConfig.descriptionItalic ? 'italic' : 'normal',
+                        textDecoration: state.appConfig.descriptionUnderline ? 'underline' : 'none',
+                        textAlign: state.appConfig.descriptionAlign || 'center',
                         whiteSpace: 'pre-wrap' 
                     }}
                 >
@@ -209,49 +238,80 @@ export const Home: React.FC = () => {
         </form>
       </div>
 
-      {/* Categories */}
-      <div className="px-4 mb-6">
-        <div className="flex justify-between items-end mb-3">
-            <h2 className="text-sky-900 font-bold text-lg">Categorias</h2>
-            <button 
-                onClick={() => dispatch({ type: 'SET_CATEGORY', payload: null })}
-                className="text-xs text-primary font-semibold underline"
-            >
-                Ver tudo
-            </button>
-        </div>
-        <div className="flex space-x-3 overflow-x-auto no-scrollbar pb-2">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              onClick={() => dispatch({ type: 'SET_CATEGORY', payload: cat })}
-              className={`flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold transition-all transform hover:scale-105 ${state.selectedCategory === cat ? 'bg-primary text-white shadow-lg shadow-sky-200' : 'bg-white text-gray-500 border border-gray-100 shadow-sm hover:border-primary/30'}`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* FILTER CONTROLS */}
+      <div className="px-4 space-y-4 mb-6">
+          
+          {/* 1. TYPE FILTER (TABS) */}
+          <div className="flex bg-gray-100 p-1 rounded-xl">
+               <button 
+                  onClick={() => dispatch({ type: 'SET_SUBTYPE', payload: 'ALL' })}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${state.selectedSubtype === 'ALL' ? 'bg-white shadow text-sky-700' : 'text-gray-500'}`}
+               >
+                   <Grid size={14} /> Todos
+               </button>
+               <button 
+                  onClick={() => dispatch({ type: 'SET_SUBTYPE', payload: 'COMMERCE' })}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${state.selectedSubtype === 'COMMERCE' ? 'bg-white shadow text-sky-700' : 'text-gray-500'}`}
+               >
+                   <ShoppingBag size={14} /> Comércios
+               </button>
+               <button 
+                  onClick={() => dispatch({ type: 'SET_SUBTYPE', payload: 'SERVICE' })}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${state.selectedSubtype === 'SERVICE' ? 'bg-white shadow text-sky-700' : 'text-gray-500'}`}
+               >
+                   <Briefcase size={14} /> Serviços
+               </button>
+          </div>
 
-      {/* Distance Filters */}
-      <div className="px-4 mb-4">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
-              <div className="flex items-center text-xs text-gray-400 font-bold mr-2">
-                  <Filter size={14} className="mr-1" /> Raio:
+          {/* 2. CATEGORIES (Horizontal Scroll) */}
+          <div>
+            <div className="flex justify-between items-end mb-2">
+                <h2 className="text-gray-600 font-bold text-xs uppercase tracking-wider">Categorias</h2>
+                <button 
+                    onClick={() => dispatch({ type: 'SET_CATEGORY', payload: null })}
+                    className="text-xs text-primary font-semibold underline"
+                >
+                    Ver todas
+                </button>
+            </div>
+            <div className="flex space-x-3 overflow-x-auto no-scrollbar pb-2">
+            {CATEGORIES.map(cat => (
+                <button
+                key={cat}
+                onClick={() => dispatch({ type: 'SET_CATEGORY', payload: cat })}
+                className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all transform hover:scale-105 ${state.selectedCategory === cat ? 'bg-primary text-white shadow-md' : 'bg-white text-gray-500 border border-gray-100 shadow-sm'}`}
+                >
+                {cat}
+                </button>
+            ))}
+            </div>
+          </div>
+
+          {/* 3. ADDITIONAL FILTERS (Neighborhood & Distance) */}
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+              {/* Neighborhood Dropdown */}
+              <div className="relative">
+                  <select
+                      value={state.selectedNeighborhood || ''}
+                      onChange={(e) => dispatch({ type: 'SET_NEIGHBORHOOD', payload: e.target.value || null })}
+                      className={`appearance-none pl-8 pr-8 py-2 rounded-lg text-xs font-bold border outline-none focus:ring-2 focus:ring-primary/50 transition-all ${state.selectedNeighborhood ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-gray-600 border-gray-200'}`}
+                  >
+                      <option value="">Bairro: Todos</option>
+                      {ALLOWED_NEIGHBORHOODS.map(n => (
+                          <option key={n} value={n} className="text-gray-800 bg-white">{n}</option>
+                      ))}
+                  </select>
+                  <MapPin size={12} className={`absolute left-2.5 top-2.5 ${state.selectedNeighborhood ? 'text-white' : 'text-gray-400'}`} />
               </div>
-              <button 
-                  onClick={() => setMaxDistance(null)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${maxDistance === null ? 'bg-sky-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
-              >
-                  Todos
-              </button>
-              {[1, 3, 5, 10, 20].map(dist => (
+
+              {/* Distance Dropdown/Buttons (Simplified) */}
+              {[3, 5, 10].map(dist => (
                   <button 
                       key={dist}
-                      onClick={() => setMaxDistance(dist)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1 ${maxDistance === dist ? 'bg-sky-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'}`}
+                      onClick={() => setMaxDistance(maxDistance === dist ? null : dist)}
+                      className={`px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1 border ${maxDistance === dist ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-gray-600 border-gray-200'}`}
                   >
-                      {maxDistance === dist && <Check size={12} />}
+                      {maxDistance === dist ? <Check size={12} /> : <Filter size={12} />}
                       Até {dist}km
                   </button>
               ))}
@@ -262,7 +322,10 @@ export const Home: React.FC = () => {
       <div className="px-4">
         <div className="flex justify-between items-center mb-3">
             <h2 className="text-sky-900 font-bold text-lg">
-                {state.selectedCategory ? `${state.selectedCategory} na Região` : 'Destaques Locais'}
+                {state.selectedCategory ? `${state.selectedCategory}` : 
+                 state.selectedSubtype === 'COMMERCE' ? 'Comércios Locais' :
+                 state.selectedSubtype === 'SERVICE' ? 'Prestadores de Serviço' :
+                 'Destaques Locais'}
             </h2>
             {state.userLocation && (
                 <span className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-full flex items-center font-bold">
@@ -276,16 +339,11 @@ export const Home: React.FC = () => {
             <div className="bg-sky-50 rounded-full h-20 w-20 flex items-center justify-center mx-auto mb-4">
                 <Search className="text-primary" size={32}/>
             </div>
-            <p className="text-gray-500 font-medium">Nenhum resultado encontrado nesta área.</p>
-            {maxDistance !== null && (
-                <p className="text-xs text-gray-400 mt-2">Tente aumentar o raio de distância.</p>
-            )}
-            <Button variant="outline" className="mt-6 border-primary text-primary" onClick={() => {
-                dispatch({ type: 'SET_CATEGORY', payload: null });
-                dispatch({ type: 'SET_SEARCH', payload: '' });
-                setLocalSearch('');
-                setMaxDistance(null);
-            }}>Limpar Filtros</Button>
+            <p className="text-gray-500 font-medium">Nenhum resultado encontrado.</p>
+            <p className="text-xs text-gray-400 mt-2">Tente ajustar os filtros de bairro ou categoria.</p>
+            <Button variant="outline" className="mt-6 border-primary text-primary" onClick={clearFilters}>
+                <X size={16} className="mr-1" /> Limpar Filtros
+            </Button>
           </div>
         ) : (
           sortedVendors.map(vendor => (
