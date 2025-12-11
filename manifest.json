@@ -13,13 +13,13 @@
   "categories": ["lifestyle", "shopping", "utilities", "local"],
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/854/854878.png",
+      "src": "https://crinfinformatica.vercel.app/social.png?v=3",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/854/854878.png",
+      "src": "https://crinfinformatica.vercel.app/social.png?v=3",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -29,7 +29,7 @@
     {
       "name": "Buscar",
       "url": "./index.html",
-      "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/854/854878.png", "sizes": "192x192" }]
+      "icons": [{ "src": "https://crinfinformatica.vercel.app/social.png?v=3", "sizes": "192x192" }]
     }
   ],
   "screenshots": [
