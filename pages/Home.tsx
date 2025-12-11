@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
-import { Search, MapPin, Filter, Store, UserPlus, Navigation, Share2, Check, Briefcase, ShoppingBag, Grid, X } from 'lucide-react';
+import { Search, MapPin, Filter, Store, UserPlus, Navigation, Share2, Check, Briefcase, ShoppingBag, Grid, X, User } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Vendor, CATEGORIES } from '../types';
+import { Vendor, CATEGORIES, UserType } from '../types';
 import { VendorCard, Button, AppLogo } from '../components/UI';
 import { useAppContext } from '../App';
 import { interpretSearchQuery } from '../services/geminiService';
@@ -157,7 +156,7 @@ export const Home: React.FC = () => {
                 </p>
                 
                 {/* Main Action Buttons */}
-                <div className="w-full space-y-4 max-w-sm">
+                <div className="w-full space-y-3 max-w-sm">
                     <button 
                         onClick={() => setViewMode('search')}
                         className="group w-full bg-primary hover:bg-sky-600 text-white font-bold text-lg py-4 px-6 rounded-2xl shadow-lg shadow-sky-200 transform transition active:scale-95 flex items-center justify-center gap-3 border-b-4 border-sky-700 relative overflow-hidden"
@@ -167,13 +166,27 @@ export const Home: React.FC = () => {
                         <span className="relative z-10">Explorar Agora</span>
                     </button>
 
-                    <button 
-                        onClick={() => navigate('/register')}
-                        className="group w-full bg-white hover:bg-gray-50 text-sky-700 font-bold text-lg py-4 px-6 rounded-2xl shadow-md transform transition active:scale-95 flex items-center justify-center gap-3 border border-sky-100"
-                    >
-                        <Store size={24} className="text-sky-500 relative z-10" />
-                        <span className="relative z-10">Cadastrar Negócio</span>
-                    </button>
+                    <div className="flex gap-2">
+                         <button 
+                             onClick={() => navigate('/register', { state: { initialTab: UserType.USER } })}
+                             className="flex-1 bg-white hover:bg-gray-50 text-sky-700 font-bold py-3 px-2 rounded-2xl shadow-md transform transition active:scale-95 flex flex-col items-center justify-center gap-1 border border-sky-100 h-24"
+                         >
+                             <div className="bg-sky-50 p-2 rounded-full mb-1">
+                                <User size={20} className="text-sky-600" />
+                             </div>
+                             <span className="text-xs">Criar Conta<br/>(Cliente)</span>
+                         </button>
+
+                         <button 
+                             onClick={() => navigate('/register', { state: { initialTab: UserType.VENDOR } })}
+                             className="flex-1 bg-white hover:bg-gray-50 text-sky-700 font-bold py-3 px-2 rounded-2xl shadow-md transform transition active:scale-95 flex flex-col items-center justify-center gap-1 border border-sky-100 h-24"
+                         >
+                             <div className="bg-sky-50 p-2 rounded-full mb-1">
+                                <Store size={20} className="text-sky-600" />
+                             </div>
+                             <span className="text-xs">Cadastrar<br/>Negócio</span>
+                         </button>
+                    </div>
 
                     {/* Botão de Compartilhar App */}
                     <button 

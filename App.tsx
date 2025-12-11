@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, Suspense, lazy, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera, Upload, X, MapPin, Heart, Check, FileText } from 'lucide-react';
@@ -216,6 +215,9 @@ const Footer = () => {
     <div className="w-full py-8 text-center bg-transparent mt-auto mb-20">
       <p className="text-[10px] text-gray-400 font-medium">
         Desenvolvido por <span className="text-primary font-bold">Crinf-Informática</span>
+      </p>
+      <p className="text-[9px] text-gray-300 font-mono mt-1 uppercase tracking-widest">
+        Versão de Teste (Beta)
       </p>
       <div className="flex justify-center gap-4 mt-2">
           <a 
@@ -615,7 +617,8 @@ const Login: React.FC = () => {
     };
 
     const handleGoogleNewUser = (googleData: any) => {
-        navigate('/register', { state: { googleData } });
+        // Pass a default "USER" type for Google Login to simplify flow
+        navigate('/register', { state: { googleData, initialTab: UserEnum.USER } });
     };
 
     const handleForgotPassword = async () => {
@@ -703,7 +706,7 @@ const Login: React.FC = () => {
                   
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-700 text-center">
                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Não tem uma conta?</p>
-                       <Link to="/register" className="text-primary font-bold hover:underline">
+                       <Link to="/register" state={{ initialTab: UserEnum.USER }} className="text-primary font-bold hover:underline">
                            Criar nova conta
                        </Link>
                   </div>
