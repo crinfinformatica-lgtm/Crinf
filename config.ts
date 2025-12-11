@@ -1,7 +1,7 @@
 
 export const APP_CONFIG = {
-  VERSION: '2.2',
-  NAME: 'O Que Tem Perto? - Águas Claras',
+  VERSION: '2.4',
+  NAME: 'O Que Tem Perto?',
   EMAILJS: {
     SERVICE_ID: 'service_dqxdi2a',
     TEMPLATE_ID: 'template_8cthxoh',

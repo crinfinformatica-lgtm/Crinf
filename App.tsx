@@ -40,7 +40,7 @@ const initialState: AppState = {
     securityLogs: [],
     darkMode: localStorage.getItem('theme') === 'dark',
     appConfig: {
-        appName: "O QUE TEM PERTO?",
+        appName: "O Que Tem Perto?",
         appDescription: "Descubra os melhores serviços e comércios da região em um só lugar.",
         descriptionColor: "#64748b", // Default Slate-500
         descriptionSize: 14,

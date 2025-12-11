@@ -1,26 +1,25 @@
-
 {
   "id": "./",
   "name": "O Que Tem Perto?",
-  "short_name": "CL Perto",
+  "short_name": "O Que Tem Perto?",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f0f9ff",
   "theme_color": "#0ea5e9",
-  "description": "Guia exclusivo de comércios e serviços de Campo Largo/PR. Encontre o que precisa perto de você.",
+  "description": "Guia de comércios e serviços locais.",
   "orientation": "portrait",
   "prefer_related_applications": false,
   "categories": ["lifestyle", "shopping", "utilities", "local"],
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/854/854878.png",
+      "src": "./logo-social.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/854/854878.png",
+      "src": "./logo-social.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -30,12 +29,7 @@
     {
       "name": "Buscar",
       "url": "./index.html",
-      "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/854/854878.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Meu Perfil",
-      "url": "./index.html",
-      "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/854/854878.png", "sizes": "192x192" }]
+      "icons": [{ "src": "./logo-social.png", "sizes": "192x192" }]
     }
   ],
   "screenshots": [
@@ -46,7 +40,7 @@
       "form_factor": "narrow"
     },
     {
-      "src": "https://via.placeholder.com/1920x1080.png/0ea5e9/ffffff?text=Guia+de+Campo+Largo",
+      "src": "https://via.placeholder.com/1920x1080.png/0ea5e9/ffffff?text=Guia+Oficial",
       "sizes": "1920x1080",
       "type": "image/png",
       "form_factor": "wide"
