@@ -66,6 +66,7 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
     const [preview, setPreview] = useState<string | null>(currentPhotoUrl || null);
     const [urlInput, setUrlInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [detectedType, setDetectedType] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -83,6 +84,7 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
         // Detectar se é PNG para manter transparência
         const isPng = file.type === 'image/png';
         const outputMime = isPng ? 'image/png' : 'image/jpeg';
+        setDetectedType(isPng ? 'PNG (Transparente)' : 'JPG (Otimizado)');
         
         reader.onload = (e) => {
             const img = new Image();
@@ -157,14 +159,16 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
             <div className={`border-2 border-dashed rounded-xl p-4 text-center transition-all relative overflow-hidden bg-gray-50 ${preview ? 'border-primary' : 'border-gray-300'}`}>
                 
                 {preview && (
-                    // Fundo xadrez para visualizar transparência
-                    <div className="mb-3 relative w-32 h-32 mx-auto rounded-lg overflow-hidden border border-gray-200 shadow-sm bg-[url('https://www.transparenttextures.com/patterns/checkerboard.png')]">
-                        <img 
-                            src={preview} 
-                            alt="Preview" 
-                            className="w-full h-full object-contain" 
-                            onError={() => setPreview(null)} 
-                        />
+                    <div className="relative">
+                        {/* Fundo xadrez para visualizar transparência */}
+                        <div className="mb-3 relative w-32 h-32 mx-auto rounded-lg overflow-hidden border border-gray-200 shadow-sm bg-[url('https://www.transparenttextures.com/patterns/checkerboard.png')]">
+                            <img 
+                                src={preview} 
+                                alt="Preview" 
+                                className="w-full h-full object-contain" 
+                                onError={() => setPreview(null)} 
+                            />
+                        </div>
                         <button 
                             type="button"
                             onClick={(e) => {
@@ -172,11 +176,17 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
                                 setPreview(null);
                                 setUrlInput('');
                                 onPhotoSelected('');
+                                setDetectedType(null);
                             }}
-                            className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full shadow hover:bg-red-600"
+                            className="absolute -top-2 right-1/2 translate-x-16 translate-y-2 bg-red-500 text-white p-1 rounded-full shadow hover:bg-red-600 z-10"
                         >
                             <X size={12} />
                         </button>
+                        {detectedType && (
+                            <p className="text-[10px] text-green-600 font-bold mb-2 flex items-center justify-center gap-1">
+                                <Check size={10} /> {detectedType}
+                            </p>
+                        )}
                     </div>
                 )}
 
@@ -190,11 +200,8 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
                         ) : (
                             <>
                                 {!preview && <Upload className="mx-auto text-gray-400 mb-2" />}
-                                <p className="text-sm text-gray-600 font-medium">Clique para enviar foto</p>
-                                <p className="text-xs text-gray-400 mt-1">Suporta PNG (Fundo Transparente)</p>
-                                <div className="flex items-center justify-center gap-1 mt-2 text-[10px] text-green-600 bg-green-50 inline-block px-2 py-1 rounded">
-                                     <Check size={10} /> Otimização Automática
-                                </div>
+                                <p className="text-sm text-gray-600 font-medium">Clique para selecionar</p>
+                                <p className="text-xs text-gray-400 mt-1">Suporta PNG Transparente</p>
                             </>
                         )}
                         <input 
@@ -828,7 +835,7 @@ export const AppLogo: React.FC<AppLogoProps> = ({ config: propConfig, customUrl 
                  <img 
                     src={logoImage} 
                     alt="Logo" 
-                    className="object-contain drop-shadow-xl"
+                    className="object-contain drop-shadow-xl bg-transparent"
                     style={{ maxWidth: `${config.logoWidth}px`, width: '100%', height: 'auto' }}
                  />
             </div>
@@ -837,7 +844,7 @@ export const AppLogo: React.FC<AppLogoProps> = ({ config: propConfig, customUrl 
 
     // Default SVG Fallback
     return (
-        <svg viewBox="-5 -5 110 110" className="w-full h-auto drop-shadow-xl animate-fade-in mx-auto" style={{ maxWidth: `${config.logoWidth}px` }}>
+        <svg viewBox="-5 -5 110 110" className="w-full h-auto drop-shadow-xl animate-fade-in mx-auto bg-transparent" style={{ maxWidth: `${config.logoWidth}px` }}>
             <defs>
             <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
                 <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
