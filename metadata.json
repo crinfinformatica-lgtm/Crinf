@@ -1,6 +1,6 @@
 {
-  "name": "O Que Tem Perto?",
-  "description": "Guia exclusivo de comércios e serviços de Campo Largo/PR.",
+  "name": "Conecta Local",
+  "description": "Guia e diretório de comércios e serviços locais.",
   "requestFramePermissions": [
     "geolocation"
   ]

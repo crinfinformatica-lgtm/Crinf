@@ -926,6 +926,7 @@ export const AdminDashboard: React.FC = () => {
 
                          <div>
                              <label className="block text-sm font-medium text-gray-700 mb-2">Logo do App</label>
+                             <p className="text-xs text-gray-400 mb-2">Recomendado: Arquivo PNG com fundo transparente.</p>
                              <PhotoSelector 
                                 label="Enviar Logo Customizada"
                                 currentPhotoUrl={tempConfig.logoUrl}
@@ -976,8 +977,9 @@ export const AdminDashboard: React.FC = () => {
                      </div>
                 </div>
 
+                {/* PRÉ-VISUALIZAÇÃO DA LOGO NO PAINEL ADMIN COM FUNDO XADREZ */}
                 <div className="border border-gray-200 rounded-3xl overflow-hidden relative shadow-xl bg-sky-50 aspect-[9/16] max-w-xs mx-auto flex flex-col">
-                    <div className="bg-white/80 backdrop-blur-md p-4 pt-8 text-center border-b border-sky-100">
+                    <div className="bg-white/80 backdrop-blur-md p-4 pt-8 text-center border-b border-sky-100 bg-[url('https://www.transparenttextures.com/patterns/checkerboard.png')]">
                          <div className="transform origin-top transition-all duration-300">
                              <AppLogo config={tempConfig} />
                          </div>
@@ -996,15 +998,15 @@ export const AdminDashboard: React.FC = () => {
                             {tempConfig.appDescription}
                          </p>
                     </div>
-                    <div className="flex-1 p-4 overflow-hidden">
+                    <div className="flex-1 p-4 overflow-hidden bg-white">
                         <div className="space-y-3 opacity-50 pointer-events-none">
-                             <div className="h-10 bg-white rounded-xl w-full"></div>
+                             <div className="h-10 bg-gray-100 rounded-xl w-full"></div>
                              <div className="flex gap-2">
-                                 <div className="h-8 w-20 bg-white rounded-lg"></div>
-                                 <div className="h-8 w-20 bg-white rounded-lg"></div>
+                                 <div className="h-8 w-20 bg-gray-100 rounded-lg"></div>
+                                 <div className="h-8 w-20 bg-gray-100 rounded-lg"></div>
                              </div>
-                             <div className="h-32 bg-white rounded-2xl w-full"></div>
-                             <div className="h-32 bg-white rounded-2xl w-full"></div>
+                             <div className="h-32 bg-gray-100 rounded-2xl w-full"></div>
+                             <div className="h-32 bg-gray-100 rounded-2xl w-full"></div>
                         </div>
                     </div>
                     

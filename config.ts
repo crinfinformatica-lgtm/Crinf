@@ -1,7 +1,7 @@
 
 export const APP_CONFIG = {
-  VERSION: '2.4',
-  NAME: 'O Que Tem Perto?',
+  VERSION: '2.5',
+  NAME: 'Conecta Local',
   EMAILJS: {
     SERVICE_ID: 'service_dqxdi2a',
     TEMPLATE_ID: 'template_8cthxoh',

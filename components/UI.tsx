@@ -54,7 +54,7 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-// --- Photo Selector Component (COM COMPRESSÃO AUTOMÁTICA) ---
+// --- Photo Selector Component (COM SUPORTE A PNG/TRANSPARÊNCIA) ---
 interface PhotoSelectorProps {
     currentPhotoUrl?: string | null;
     onPhotoSelected: (data: string) => void; // Returns Base64 or URL
@@ -75,10 +75,14 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
         }
     }, [currentPhotoUrl]);
 
-    // FUNÇÃO MÁGICA: Reduz a imagem ANTES de qualquer coisa
+    // FUNÇÃO MÁGICA: Reduz a imagem preservando PNG se necessário
     const processFile = (file: File) => {
         setIsProcessing(true);
         const reader = new FileReader();
+        
+        // Detectar se é PNG para manter transparência
+        const isPng = file.type === 'image/png';
+        const outputMime = isPng ? 'image/png' : 'image/jpeg';
         
         reader.onload = (e) => {
             const img = new Image();
@@ -86,10 +90,9 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
             
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 800; // Limite seguro para qualquer celular
+                const MAX_WIDTH = 800; 
                 const scaleSize = MAX_WIDTH / img.width;
                 
-                // Se a imagem for menor que o limite, usa tamanho original, senão reduz
                 const width = (scaleSize < 1) ? MAX_WIDTH : img.width;
                 const height = (scaleSize < 1) ? img.height * scaleSize : img.height;
 
@@ -99,10 +102,12 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
                 const ctx = canvas.getContext('2d');
                 if (ctx) {
                     ctx.drawImage(img, 0, 0, width, height);
-                    // Comprime para JPEG 70% -> Resultado ~50kb a 150kb
-                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
                     
-                    console.log("Imagem otimizada:", (compressedDataUrl.length / 1024).toFixed(2), "KB");
+                    // Se for PNG, usamos qualidade 1.0 (lossless relative). Se JPG, 0.7
+                    const quality = isPng ? 1.0 : 0.7;
+                    const compressedDataUrl = canvas.toDataURL(outputMime, quality);
+                    
+                    console.log(`Imagem processada (${outputMime}):`, (compressedDataUrl.length / 1024).toFixed(2), "KB");
                     
                     setPreview(compressedDataUrl);
                     onPhotoSelected(compressedDataUrl);
@@ -152,11 +157,12 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
             <div className={`border-2 border-dashed rounded-xl p-4 text-center transition-all relative overflow-hidden bg-gray-50 ${preview ? 'border-primary' : 'border-gray-300'}`}>
                 
                 {preview && (
-                    <div className="mb-3 relative w-32 h-32 mx-auto rounded-lg overflow-hidden border border-gray-200 shadow-sm bg-white">
+                    // Fundo xadrez para visualizar transparência
+                    <div className="mb-3 relative w-32 h-32 mx-auto rounded-lg overflow-hidden border border-gray-200 shadow-sm bg-[url('https://www.transparenttextures.com/patterns/checkerboard.png')]">
                         <img 
                             src={preview} 
                             alt="Preview" 
-                            className="w-full h-full object-cover" 
+                            className="w-full h-full object-contain" 
                             onError={() => setPreview(null)} 
                         />
                         <button 
@@ -179,13 +185,13 @@ export const PhotoSelector: React.FC<PhotoSelectorProps> = ({ currentPhotoUrl, o
                         {isProcessing ? (
                             <div className="flex flex-col items-center">
                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
-                                <p className="text-xs text-primary font-bold">Otimizando foto...</p>
+                                <p className="text-xs text-primary font-bold">Processando imagem...</p>
                             </div>
                         ) : (
                             <>
                                 {!preview && <Upload className="mx-auto text-gray-400 mb-2" />}
                                 <p className="text-sm text-gray-600 font-medium">Clique para enviar foto</p>
-                                <p className="text-xs text-gray-400 mt-1">Galeria, Câmera ou Google Fotos</p>
+                                <p className="text-xs text-gray-400 mt-1">Suporta PNG (Fundo Transparente)</p>
                                 <div className="flex items-center justify-center gap-1 mt-2 text-[10px] text-green-600 bg-green-50 inline-block px-2 py-1 rounded">
                                      <Check size={10} /> Otimização Automática
                                 </div>
@@ -495,6 +501,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropComp
 
       ctx.drawImage(img, x, y, drawWidth, drawHeight);
       ctx.restore();
+      // PNG para suportar transparência se necessário
       onCropComplete(canvas.toDataURL('image/png', 0.9));
     }
   };
@@ -867,7 +874,7 @@ export const AppLogo: React.FC<AppLogoProps> = ({ config: propConfig, customUrl 
                 <g transform="translate(30, 70)">
                     <circle r="19" fill="white" stroke={config.primaryColor} strokeWidth="3" filter="url(#shadow)"/>
                     <g transform="translate(-9, -9) scale(0.75)">
-                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" fill={config.primaryColor}/>
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" fill={config.primaryColor}"/>
                     </g>
                 </g>
 

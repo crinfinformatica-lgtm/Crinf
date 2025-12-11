@@ -1,25 +1,25 @@
 {
   "id": "./",
-  "name": "O Que Tem Perto?",
-  "short_name": "O Que Tem Perto?",
+  "name": "Conecta Local",
+  "short_name": "Conecta Local",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f0f9ff",
   "theme_color": "#0ea5e9",
-  "description": "Guia de comércios e serviços locais.",
+  "description": "Guia e diretório de comércios e serviços locais.",
   "orientation": "portrait",
   "prefer_related_applications": false,
   "categories": ["lifestyle", "shopping", "utilities", "local"],
   "icons": [
     {
-      "src": "./logo-social.png",
+      "src": "https://cdn-icons-png.flaticon.com/512/854/854878.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "./logo-social.png",
+      "src": "https://cdn-icons-png.flaticon.com/512/854/854878.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -29,12 +29,12 @@
     {
       "name": "Buscar",
       "url": "./index.html",
-      "icons": [{ "src": "./logo-social.png", "sizes": "192x192" }]
+      "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/854/854878.png", "sizes": "192x192" }]
     }
   ],
   "screenshots": [
     {
-      "src": "https://via.placeholder.com/1080x1920.png/0ea5e9/ffffff?text=O+Que+Tem+Perto",
+      "src": "https://via.placeholder.com/1080x1920.png/0ea5e9/ffffff?text=Conecta+Local",
       "sizes": "1080x1920",
       "type": "image/png",
       "form_factor": "narrow"

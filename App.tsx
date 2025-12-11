@@ -40,8 +40,8 @@ const initialState: AppState = {
     securityLogs: [],
     darkMode: localStorage.getItem('theme') === 'dark',
     appConfig: {
-        appName: "O Que Tem Perto?",
-        appDescription: "Descubra os melhores serviços e comércios da região em um só lugar.",
+        appName: "Conecta Local",
+        appDescription: "Guia comercial e serviços locais. Encontre tudo o que precisa perto de você.",
         descriptionColor: "#64748b", // Default Slate-500
         descriptionSize: 14,
         descriptionAlign: 'center',
