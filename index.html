@@ -25,12 +25,8 @@
     
     <!-- 
       =======================================================================
-      FACEBOOK & OPEN GRAPH & WHATSAPP
+      FACEBOOK & OPEN GRAPH & WHATSAPP CONFIG
       =======================================================================
-      IMPORTANTE: 
-      1. O arquivo 'social.png' deve estar na pasta 'public' ou na raiz.
-      2. TAMANHO: A imagem deve ter menos de 300KB (Crucial para WhatsApp).
-      3. DIMENSÕES: Idealmente 1200x630 pixels.
     -->
     <meta property="fb:app_id" content="966242223397117" />
     <meta property="og:type" content="website" />
@@ -40,26 +36,28 @@
     <meta property="og:site_name" content="O que tem perto?" />
     <meta property="og:locale" content="pt_BR" />
     
-    <!-- Imagem de Compartilhamento -->
-    <!-- ?v=5 força o WhatsApp a buscar a imagem novamente se ela mudou -->
-    <meta property="og:image" content="https://crinfinformatica.vercel.app/social.png?v=5" />
-    <meta property="og:image:secure_url" content="https://crinfinformatica.vercel.app/social.png?v=5" />
+    <!-- 
+       IMAGEM DE COMPARTILHAMENTO - CONFIGURAÇÃO ESTRITA 
+       O Facebook exige tags de dimensão EXPLICITAS para renderizar na primeira vez.
+    -->
+    <meta property="og:image" content="https://crinfinformatica.vercel.app/social.png?v=6" />
+    <meta property="og:image:secure_url" content="https://crinfinformatica.vercel.app/social.png?v=6" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Guia O que tem perto?" />
+    <meta property="og:image:alt" content="Guia O que tem perto - Águas Claras e Região" />
 
     <!-- Google / SEO -->
     <meta itemprop="name" content="O que tem perto?">
     <meta itemprop="description" content="Guia exclusivo de comércios e serviços Águas Claras e Região.">
-    <meta itemprop="image" content="https://crinfinformatica.vercel.app/social.png?v=5">
+    <meta itemprop="image" content="https://crinfinformatica.vercel.app/social.png?v=6">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:url" content="https://crinfinformatica.vercel.app/" />
     <meta name="twitter:title" content="O que tem perto?" />
     <meta name="twitter:description" content="Guia exclusivo de comércios e serviços Águas Claras e Região." />
-    <meta name="twitter:image" content="https://crinfinformatica.vercel.app/social.png?v=5" />
+    <meta name="twitter:image" content="https://crinfinformatica.vercel.app/social.png?v=6" />
     
     <!-- iOS / Apple -->
     <meta name="apple-mobile-web-app-capable" content="yes">
