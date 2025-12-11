@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'cl-perto-v7'; // Incremented version to force update
+const CACHE_NAME = 'oqtp-v8'; // Atualizado para limpar cache antigo e forçar nova imagem
 const urlsToCache = [
   './',
   './index.html',

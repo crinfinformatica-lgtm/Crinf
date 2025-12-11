@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, Suspense, lazy, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Home as HomeIcon, User, Settings, PlusCircle, Instagram, Shield, Lock, Mail, ArrowRight, CheckCircle, AlertTriangle, Clock, LogOut, ChevronRight, Bell, Moon, KeyRound, Share2, Copy, Edit3, Camera, Upload, X, MapPin, Heart, Check, FileText } from 'lucide-react';
@@ -40,8 +41,8 @@ const initialState: AppState = {
     securityLogs: [],
     darkMode: localStorage.getItem('theme') === 'dark',
     appConfig: {
-        appName: "Conecta Local",
-        appDescription: "Guia comercial e serviços locais. Encontre tudo o que precisa perto de você.",
+        appName: "O que tem perto?",
+        appDescription: "Guia exclusivo de comércios e serviços Águas Claras e Região",
         descriptionColor: "#64748b", // Default Slate-500
         descriptionSize: 14,
         descriptionAlign: 'center',

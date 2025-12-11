@@ -1,6 +1,6 @@
 {
-  "name": "Conecta Local",
-  "description": "Guia e diretório de comércios e serviços locais.",
+  "name": "O que tem perto?",
+  "description": "Guia exclusivo de comércios e serviços Águas Claras e Região.",
   "requestFramePermissions": [
     "geolocation"
   ]

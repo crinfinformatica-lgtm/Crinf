@@ -1,7 +1,7 @@
 
 export const APP_CONFIG = {
   VERSION: '2.5',
-  NAME: 'Conecta Local',
+  NAME: 'O que tem perto?',
   EMAILJS: {
     SERVICE_ID: 'service_dqxdi2a',
     TEMPLATE_ID: 'template_8cthxoh',
